@@ -1,0 +1,15 @@
+*.env
+Neatpazitie/*.png
+images_LoL/*.png
+generated_profile/*.png
+generated/*.png
+drawer/
+discord error logs/
+bacuup/
+BACKUP/
+attachments/
+save/
+Start of adding/
+generated2/
+jokes/
+*.log
