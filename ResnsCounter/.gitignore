@@ -1,9 +1,10 @@
 *.env
-Neatpazitie/*.png
+Neatpazitie/
 images_LoL/*.png
 generated_profile/*.png
 generated/*.png
 drawer/
+API/
 discord error logs/
 bacuup/
 BACKUP/

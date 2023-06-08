@@ -2,7 +2,7 @@ import os
 from google.cloud import translate_v2 as translate
 
 def translateMsg(msg):
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'C:/Users/ZK00138/source/repos/ResnsCounter/ResnsCounter/velvety-mason-383416-1a01dea33356.json'
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'C:/Users/ZK00138/source/repos/ResnsCounter/ResnsCounter/API/velvety-mason-383416-af8ad8fa3a59.json'
     translate_client = translate.Client()
 
     # Detect the language of the input message
