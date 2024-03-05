@@ -3,6 +3,67 @@ import pytesseract
 import numpy as np
 import discord
 
+
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras import layers, models, optimizers
+from tensorflow.keras.preprocessing import image
+
+# Function to preprocess the image
+def preprocess_image(img_path):
+    img = image.load_img(img_path, target_size=(150, 150))  # Assuming target size used during training was (150, 150)
+    img_array = image.img_to_array(img)
+    img_array = np.expand_dims(img_array, axis=0)  # Expand dimensions to create batch dimension
+    img_array /= 255.  # Normalize pixel values
+    return img_array
+
+# Function to predict class label
+def predict_class(img_path):
+    try:
+        model = tf.keras.models.load_model('game_screenshot_classifier.h5')
+        preprocessed_img = preprocess_image(img_path)
+        predictions = model.predict(preprocessed_img)
+        predicted_class = np.argmax(predictions)
+        confidence_score = predictions[0][predicted_class]  # Confidence score for the predicted class
+        return predicted_class, confidence_score
+    except Exception as e:
+        # Handle the exception gracefully
+        print("An error occurred during prediction:", e)
+        return None, None
+
+def IdentifyGame_v2(image):
+
+    model = tf.keras.models.load_model('game_screenshot_classifier.h5')
+    class_to_game = {
+        0: "Apex Legends", 
+        1: "COD MW3 Multiplayer", 
+        2: "CS2",
+        3: "League of Legends",
+        4: "Other",
+        5: "Warzone 2.0"
+    }
+
+        
+    try:
+        # Example usage
+        #img_path = 'F:/Downloads/0_2023-09-11_11-49-58_image.png'
+        img_path = image
+        predicted_class, confidence_score = predict_class(img_path)
+        if predicted_class is not None:
+            predicted_game = class_to_game[predicted_class]
+            print(predicted_game)
+            return predicted_game
+        else:
+            # Handle the case when prediction fails
+            print("Unable to predict the game.")
+            return None
+    except Exception as e:
+        # Handle the exception gracefully
+        print("An error occurred:", e)
+        return None
+
+
 def IdentifyGame(image):
     print('IdentifyGame initiated')
     end = False
@@ -10,14 +71,14 @@ def IdentifyGame(image):
     title = 'Unrecognised'
     while end == False:
 
-        result = getText(image, 'SHOTS FIRED', 'CSGO') 
+        result = getText(image, 'SHOTS FIRED', 'CS2') 
         if result is not None:
             exist, title = result
         else: exist = result
         if exist:
             detected = True
             break
-        result = getText(image, 'FLASH STATS', 'CSGO') 
+        result = getText(image, 'FLASH STATS', 'CS2') 
         if result is not None:
             exist, title = result
         else: exist = result
@@ -25,7 +86,7 @@ def IdentifyGame(image):
             detected = True
             break
 
-        result = getText(image, 'Duration', 'CSGO') 
+        result = getText(image, 'Duration', 'CS2') 
         if result is not None:
             exist, title = result
         else: exist = result
@@ -84,6 +145,74 @@ def IdentifyGame(image):
             detected = True
             break
 
+
+
+
+   #     result = imageWithin(image, 'mw3_temp2.png', 'COD MW3 Multiplayer')
+   #     if result is not None:
+    #        exist, title = result
+   #     else: exist = result
+   #     if exist:
+   #         detected = True
+   #         break
+
+
+        result = getText(image, 'RATIO', 'COD MW3 Multiplayer')
+        if result is not None:
+            exist, title = result
+        else: exist = result
+        if exist:
+            detected = True
+            break
+
+
+        result = getText(image, 'MILITIA', 'COD MW3 Multiplayer')
+        if result is not None:
+            exist, title = result
+        else: exist = result
+        if exist:
+            detected = True
+            break
+        result = getText(image, 'TASK FORCE 141', 'COD MW3 Multiplayer') #@#@#@#@#@#@#@@#@#
+        if result is not None:
+            exist, title = result
+        else: exist = result
+        if exist:
+            detected = True
+            break
+
+        result = getText(image, 'SEARCH AND DESTROY', 'COD MW3 Multiplayer') #@#@#@#@#@#@#@@#@#
+        if result is not None:
+            exist, title = result
+        else: exist = result
+        if exist:
+            detected = True
+            break
+
+        result = getText(image, 'DESTROY', 'COD MW3 Multiplayer') #@#@#@#@#@#@#@@#@#
+        if result is not None:
+            exist, title = result
+        else: exist = result
+        if exist:
+            detected = True
+            break
+
+        result = getText(image, 'PLANTS', 'COD MW3 Multiplayer') #@#@#@#@#@#@#@@#@#
+        if result is not None:
+            exist, title = result
+        else: exist = result
+        if exist:
+            detected = True
+            break
+
+        result = getText(image, 'STATS', 'COD MW3 Multiplayer') #@#@#@#@#@#@#@@#@#
+        if result is not None:
+            exist, title = result
+        else: exist = result
+        if exist:
+            detected = True
+            break
+
         result = getText(image, 'Operator Kills', 'Warzone 2.0')
         if result is not None:
             exist, title = result
@@ -99,6 +228,22 @@ def IdentifyGame(image):
             detected = True
             break
         result = getText(image, 'SQUAD TOTALS', 'Warzone 2.0')
+        if result is not None:
+            exist, title = result
+        else: exist = result
+        if exist:
+            detected = True
+            break
+
+        result = getText(image, 'REDEPLOYS', 'Warzone 2.0')
+        if result is not None:
+            exist, title = result
+        else: exist = result
+        if exist:
+            detected = True
+            break
+
+        result = getText(image, 'OBJECTIVES', 'Warzone 2.0')
         if result is not None:
             exist, title = result
         else: exist = result
@@ -130,21 +275,27 @@ def IdentifyGame(image):
             detected = True
             break
 
-        result = getText(image, 'KORTAC', 'COD MW2 Multiplayer')
+
+
+
+
+
+
+        result = getText(image, 'KORTAC', 'COD MW3 Multiplayer')
         if result is not None:
             exist, title = result
         else: exist = result
         if exist:
             detected = True
             break
-        result = getText(image, 'SCOREBOARD', 'COD MW2 Multiplayer')
+        result = getText(image, 'SCOREBOARD', 'COD MW3 Multiplayer')
         if result is not None:
             exist, title = result
         else: exist = result
         if exist:
             detected = True
             break
-        result = getText(image, 'DEFENDS', 'COD MW2 Multiplayer') #@#@#@#@#@#@#@@#@#
+        result = getText(image, 'DEFENDS', 'COD MW3 Multiplayer') #@#@#@#@#@#@#@@#@#
         if result is not None:
             exist, title = result
         else: exist = result
@@ -152,7 +303,7 @@ def IdentifyGame(image):
             detected = True
             break
 
-        result = getText(image, 'SPECGRU', 'COD MW2 Multiplayer')
+        result = getText(image, 'SPECGRU', 'COD MW3 Multiplayer')
         if result is not None:
             exist, title = result
         else: exist = result
@@ -160,7 +311,7 @@ def IdentifyGame(image):
             detected = True
             break
 
-        result = getText(image, 'DIVISION', 'COD MW2 Multiplayer')
+        result = getText(image, 'DIVISION', 'COD MW3 Multiplayer')
         if result is not None:
             exist, title = result
         else: exist = result
@@ -168,7 +319,7 @@ def IdentifyGame(image):
             detected = True
             break
 
-        result = getText(image, 'VICTORY STREAK', 'COD MW2 Multiplayer')
+        result = getText(image, 'VICTORY STREAK', 'COD MW3 Multiplayer')
         if result is not None:
             exist, title = result
         else: exist = result
@@ -291,7 +442,8 @@ def IdentifyGame(image):
             detected = True
             break
 
-        result = getText(image, 'Contracts', 'Warzone 1.0')
+
+        result = imageWithin(image, 'mp_temp.png', 'COD MW3 Multiplayer')
         if result is not None:
             exist, title = result
         else: exist = result
@@ -299,14 +451,30 @@ def IdentifyGame(image):
             detected = True
             break
 
-        result = imageWithin(image, 'mp_temp.png', 'COD MW2 Multiplayer')
+      #  result = imageWithin(image, 'finals_sample1.png', 'The Finals')
+      #  if result is not None:
+      #      exist, title = result
+      #  else: exist = result
+      #  if exist:
+      #      detected = True
+      #      break
+
+       # result = imageWithin(image, 'finals_sample2.png', 'The Finals')
+       # if result is not None:
+       #     exist, title = result
+       # else: exist = result
+       # if exist:
+       #     detected = True
+       #     break
+
+
+        result = imageWithin(image, 'mw3_snd_temp.PNG', 'COD MW3 Multiplayer')
         if result is not None:
             exist, title = result
         else: exist = result
         if exist:
             detected = True
             break
-
 
         result = imageWithin(image, 'warzone_template22.png', 'Warzone 2.0')
         if result is not None:
@@ -323,7 +491,7 @@ def IdentifyGame(image):
             detected = True           
             break
 
-        result = imageWithin(image, 'warzone1_temp.PNG', 'Warzone 1.0') #@#@#@@
+        result = imageWithin(image, 'mw3_temp.png', 'COD MW3 Multiplayer')
         if result is not None:
             exist, title = result
         else: exist = result
@@ -331,14 +499,14 @@ def IdentifyGame(image):
             detected = True
             break
 
-        result = imageWithin(image, 'mp_ranked_temp.png', 'COD MW2 Multiplayer')
+        result = imageWithin(image, 'mp_ranked_temp.png', 'COD MW3 Multiplayer')
         if result is not None:
             exist, title = result
         else: exist = result
         if exist:
             detected = True
             break
-        result = imageWithin(image, 'mp_ranked_temp2.png', 'COD MW2 Multiplayer')
+        result = imageWithin(image, 'mp_ranked_temp2.png', 'COD MW3 Multiplayer')
         if result is not None:
             exist, title = result
         else: exist = result
@@ -347,14 +515,6 @@ def IdentifyGame(image):
             break
 
 
-
-        result = imageWithin(image, 'warzone1_temp.PNG', 'Warzone 1.0')
-        if result is not None:
-            exist, title = result
-        else: exist = result
-        if exist:
-            detected = True
-            break
 
 
 

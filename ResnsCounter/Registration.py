@@ -10,7 +10,7 @@ import asyncio
 import time
 
 #Mine
-from Recognition import IdentifyGame, getText
+from Recognition import IdentifyGame_v2, getText
 from api_LoL import getStats
 from api_giphy import getGif
 
@@ -24,7 +24,7 @@ async def load_json_file(file_name):
 
 # Reģistrē uzvaru konkrētam spēlētājam
 async def RegisterWin(wins, message, recap, sendConfirm, isStreak):
-    print('RegisterWin initiated')
+    print('\nRegisterWin initiated')
 
     # Ja ir , tad izdzēš ziņu ar bildi, kur ir lol čempions
     global champMsg_id
@@ -48,6 +48,10 @@ async def RegisterWin(wins, message, recap, sendConfirm, isStreak):
     with open('synonyms_impressive.json', 'r') as f:
        synonyms_impressive = json.load(f)
 
+    filename = "temp_win_recap.json"
+    if os.path.isfile(filename):
+       with open('temp_win_recap.json', 'r') as f:
+           temp_wins = json.load(f) 
 
     # Palielana uzvaru skaitu
     def increment_win(user_id, game_name):
@@ -56,6 +60,13 @@ async def RegisterWin(wins, message, recap, sendConfirm, isStreak):
         if game_name not in game_wins[user_id]:
             game_wins[user_id][game_name] = 0
         game_wins[user_id][game_name] += 1
+
+        if recap:
+            if user_id not in temp_wins:
+                temp_wins[user_id] = {}
+            if game_name not in temp_wins[user_id]:
+                temp_wins[user_id][game_name] = 0
+            temp_wins[user_id][game_name] += 1
 
    
     def counterr(player):
@@ -70,8 +81,9 @@ async def RegisterWin(wins, message, recap, sendConfirm, isStreak):
 
     # Iegūst lietotāju un uzvaru datubāzi
     user_id = str(message.author)
-
+    user_id = user_id.split('#')[0]
     game_wins = wins
+    #temp_wins = {}
 
     role_id = 1030500402023628850  
     role = message.guild.get_role(role_id)
@@ -85,7 +97,7 @@ async def RegisterWin(wins, message, recap, sendConfirm, isStreak):
         print(f'Saglabāju bildi {filename} no {message.author}')
 
     # Increment the game wins for the user and game
-    game_name = IdentifyGame(f'C:/Users/ZK00138/source/repos/ResnsCounter/ResnsCounter/attachments/{filename}')
+    game_name = IdentifyGame_v2(f'C:/Users/ZK00138/source/repos/ResnsCounter/ResnsCounter/attachments/{filename}')
     if game_name != 'Unrecognised':
 
         increment_win(user_id, game_name)
@@ -107,7 +119,7 @@ async def RegisterWin(wins, message, recap, sendConfirm, isStreak):
         if message.mentions:
             mentioned_users = set()  # set to keep track of unique users mentioned
             for user in message.mentions:
-                mention_id = f'{user.name}#{user.discriminator}'
+                mention_id = f'{user.name}'
                 if mention_id not in mentioned_users:  # check if user has already been mentioned
                     mentioned_users.add(mention_id)
                     increment_win(mention_id, game_name)
@@ -121,7 +133,7 @@ async def RegisterWin(wins, message, recap, sendConfirm, isStreak):
                     response = response + f"{user.mention} " #Tev tagad ir {game_wins[mention_id][game_name]} uzvaras."
 
                 # Pievieno role lietotājam
-                await user.add_roles(role)
+                await user.add_roles(role) 
         if not recap:
 
 
@@ -210,6 +222,34 @@ async def RegisterWin(wins, message, recap, sendConfirm, isStreak):
                     await asyncio.sleep(20)
                     await gif_msg.delete()
 
+                elif game_name == "The Finals":
+                   # phrases_warzone = await load_json_file('phrases_warzone.json')
+                    #gifs_warzone =    await load_json_file('gifs_warzone.json')
+                  #  random.seed(time.time())
+                   # phrase = random.choice(list(phrases_warzone.values()))
+                   # gif =    getGif("Warzone") 
+                    await message.channel.send(response)
+                    counterr(user_id)
+                 #   if counter[user_id] %4 == 0:
+                 #       await message.channel.send(phrase)
+                  #  gif_msg = await message.channel.send(gif)
+                   # await asyncio.sleep(20)
+                  #  await gif_msg.delete()
+
+                elif game_name == "COD MW3 Multiplayer":
+                    phrases_mp = await load_json_file('phrases_multiplayer.json')
+                    #gifs_warzone =    await load_json_file('gifs_warzone.json')
+                    random.seed(time.time())
+                    phrase = random.choice(list(phrases_mp.values()))
+                    gif =    getGif("cod mw3") 
+                    await message.channel.send(response)
+                    counterr(user_id)
+                    if counter[user_id] %4 == 0:
+                        await message.channel.send(phrase)
+                    gif_msg = await message.channel.send(gif)
+                    await asyncio.sleep(20)
+                    await gif_msg.delete()
+
 
                 elif game_name == "Warzone 2.0" or game_name == "Warzone 1.0":
                     phrases_warzone = await load_json_file('phrases_warzone.json')
@@ -225,12 +265,12 @@ async def RegisterWin(wins, message, recap, sendConfirm, isStreak):
                     await asyncio.sleep(20)
                     await gif_msg.delete()
 
-                elif game_name == "CSGO": 
+                elif game_name == "CS2": 
                     phrases_CSGO = await load_json_file('phrases_CSGO.json')
                     #gifs_CSGO = await load_json_file('gifs_CSGO.json')
                     random.seed(time.time())
                     phrase = random.choice(list(phrases_CSGO.values()))
-                    gif =    getGif("CSGO")
+                    gif =    getGif("CS2")
                     await message.channel.send(response)
                     await message.channel.send(phrase)
                     gif_msg = await message.channel.send(gif)
@@ -283,6 +323,9 @@ async def RegisterWin(wins, message, recap, sendConfirm, isStreak):
         # Saglaba json failā
         with open('resnums.json', 'w') as f:
             json.dump(game_wins, f)
+
+        with open('temp_win_recap.json', 'w') as f:
+            json.dump(temp_wins, f)
 
         # Saglabā excel failā no json
         df = pd.read_json('resnums.json')
@@ -352,7 +395,7 @@ async def regDayTime(hour, player):
     Period = ""
     DayTime = {}
 
-    hour = hour + 3
+    hour = hour + 2
     if hour > 24: hour = hour - 24
 
     filename = "DayTime.json"
@@ -431,7 +474,7 @@ async def Register_time(hour):
 async def RegTotalMonthWins(amount, month):
 
    winsInMonth =        {}
-   month = f'{month}_2023'
+   month = f'{month}_2024'
    with open('winsInMonth.json', 'r') as f:
        winsInMonth = json.load(f)
 
