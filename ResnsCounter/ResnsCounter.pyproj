@@ -29,6 +29,9 @@
     <Compile Include="api_google.py" />
     <Compile Include="api_LoL.py" />
     <Compile Include="bot_Chatting.py" />
+    <Compile Include="buttons.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Recognition.py">
       <SubType>Code</SubType>
     </Compile>
