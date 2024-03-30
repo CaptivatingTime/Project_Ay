@@ -53,7 +53,12 @@ import urllib.parse
 from colorama import Fore
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import T5Tokenizer, T5ForConditionalGeneration
 import torch
+from requests_toolbelt import MultipartEncoder
+
+from bs4 import BeautifulSoup
+#import BeautifulSoup
 
 def to_thread(func: typing.Callable) -> typing.Coroutine:
     @functools.wraps(func)
@@ -185,7 +190,7 @@ def  generate_gif(promptt, image_name, PingPong):
       "loop_count": 0,
       "filename_prefix": "SVD-1st-",
       "format": "image/gif",
-      "pingpong": false,
+      "pingpong": true,
       "save_image": true,
       "crf": 20,
       "save_metadata": false,
@@ -401,6 +406,1127 @@ def update_message_data(msg_id, thread_id, file_name):
 
 
 ############# gudrais ######################
+#@to_thread
+
+#@to_thread
+#def generate_3d(image):
+@to_thread
+def  generate_3d(avatar_image):
+
+    server_address = "127.0.0.1:8188"
+    client_id = str(uuid.uuid4())
+
+    def queue_prompt(prompt):
+        p = {"prompt": prompt, "client_id": client_id}
+        data = json.dumps(p).encode('utf-8')
+        req =  urllib.request.Request("http://{}/prompt".format(server_address), data=data)
+        return json.loads(urllib.request.urlopen(req).read())
+
+    def get_image(filename, subfolder, folder_type):
+        data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
+        url_values = urllib.parse.urlencode(data)
+        with urllib.request.urlopen("http://{}/view?{}".format(server_address, url_values)) as response:
+            return response.read()
+
+    def get_history(prompt_id):
+        with urllib.request.urlopen("http://{}/history/{}".format(server_address, prompt_id)) as response:
+            return json.loads(response.read())
+
+    def upload_image(input_path, name, server_address, image_type="input", overwrite=False):
+      with open(input_path, 'rb') as file:
+        multipart_data = MultipartEncoder(
+          fields= {
+            'image': (name, file, 'image/png'),
+            'type': image_type,
+            'overwrite': str(overwrite).lower()
+          }
+        )
+
+        data = multipart_data
+        headers = { 'Content-Type': multipart_data.content_type }
+        request = urllib.request.Request("http://{}/upload/image".format(server_address), data=data, headers=headers)
+        with urllib.request.urlopen(request) as response:
+          return response.read()
+
+    def get_images(ws, prompt):
+        prompt_id = queue_prompt(prompt)['prompt_id']
+        output_images = {}
+        while True:
+            out = ws.recv()
+            if isinstance(out, str):
+                message = json.loads(out)
+                if message['type'] == 'executing':
+                    data = message['data']
+                    if data['node'] is None and data['prompt_id'] == prompt_id:
+                        break #Execution is done
+            else:
+                continue #previews are binary data
+
+        history = get_history(prompt_id)[prompt_id]
+        for o in history['outputs']:
+            for node_id in history['outputs']:
+                node_output = history['outputs'][node_id]
+                if 'gifs' in node_output:
+                    images_output = []
+                    for image in node_output['gifs']:
+                        image_data = get_image(image['filename'], image['subfolder'], image['type'])
+                        images_output.append(image_data)
+                    output_images[node_id] = images_output
+
+        return output_images
+
+
+    url = "http://127.0.0.1:7860/sdapi/v1/txt2img"
+    
+    prompt_text = """
+{
+  "3": {
+    "inputs": {
+      "seed": 237898799444375,
+      "steps": 25,
+      "cfg": 7,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "15",
+        0
+      ],
+      "positive": [
+        "27",
+        0
+      ],
+      "negative": [
+        "27",
+        1
+      ],
+      "latent_image": [
+        "27",
+        2
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "3",
+        0
+      ],
+      "vae": [
+        "15",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "15": {
+    "inputs": {
+      "ckpt_name": "sv3d_p.safetensors"
+    },
+    "class_type": "ImageOnlyCheckpointLoader",
+    "_meta": {
+      "title": "Image Only Checkpoint Loader (img2vid model)"
+    }
+  },
+  "23": {
+    "inputs": {
+      "image": "ccb6882539ba5cc3c9dd919b8d5c8928 (4).webp",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "27": {
+    "inputs": {
+      "width": 576,
+      "height": 576,
+      "video_frames": 21,
+      "elevation": 0,
+      "clip_vision": [
+        "15",
+        1
+      ],
+      "init_image": [
+        "29",
+        0
+      ],
+      "vae": [
+        "15",
+        2
+      ]
+    },
+    "class_type": "SV3D_Conditioning",
+    "_meta": {
+      "title": "SV3D_Conditioning"
+    }
+  },
+  "29": {
+    "inputs": {
+      "transparency": false,
+      "model": "u2net",
+      "post_processing": false,
+      "only_mask": false,
+      "alpha_matting": false,
+      "alpha_matting_foreground_threshold": 255,
+      "alpha_matting_background_threshold": 50,
+      "alpha_matting_erode_size": 10,
+      "background_color": "white",
+      "images": [
+        "23",
+        0
+      ]
+    },
+    "class_type": "Image Rembg (Remove Background)",
+    "_meta": {
+      "title": "Image Rembg (Remove Background)"
+    }
+  },
+  "30": {
+    "inputs": {
+      "images": [
+        "29",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "32": {
+    "inputs": {
+      "frame_rate": [
+        "34",
+        2
+      ],
+      "loop_count": 0,
+      "filename_prefix": "SV3D",
+      "format": "image/gif",
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "36",
+        0
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢"
+    }
+  },
+  "33": {
+    "inputs": {
+      "number_type": "integer",
+      "number": 84
+    },
+    "class_type": "Constant Number",
+    "_meta": {
+      "title": "Desired Interpolated Frame Rate"
+    }
+  },
+  "34": {
+    "inputs": {
+      "number_type": "integer",
+      "number": 16
+    },
+    "class_type": "Constant Number",
+    "_meta": {
+      "title": "Base Frame Rate (FPS)"
+    }
+  },
+  "35": {
+    "inputs": {
+      "operation": "division",
+      "number_a": [
+        "33",
+        0
+      ],
+      "number_b": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "Number Operation",
+    "_meta": {
+      "title": "Get Frame Multiplier"
+    }
+  },
+  "36": {
+    "inputs": {
+      "ckpt_name": "rife47.pth",
+      "clear_cache_after_n_frames": 21,
+      "multiplier": [
+        "35",
+        2
+      ],
+      "fast_mode": true,
+      "ensemble": true,
+      "scale_factor": 1,
+      "frames": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "RIFE VFI",
+    "_meta": {
+      "title": "RIFE VFI (recommend rife47 and rife49)"
+    }
+  },
+  "37": {
+    "inputs": {
+      "images": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "39": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "scale_by": 1.75,
+      "image": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "ImageScaleBy",
+    "_meta": {
+      "title": "Upscale Image By"
+    }
+  }
+}
+    """
+
+  #  def queue_prompt(prompt):
+  #      p = {"prompt": prompt}
+  #      data = json.dumps(p).encode('utf-8')
+  #      req =  request.Request("http://127.0.0.1:8188/prompt", data=data)
+ #       request.urlopen(req)
+
+
+    filename = f"3d_{int(time.time())}.gif"
+    filename_h = f"ProjectAy/{filename}"
+    filename_l = f"ProjectAy/echo_{int(time.time())}_low_res"
+    random_14_digit_number = random.randint(10**13, (10**14)-1)
+    formatted_number = "{:014d}".format(random_14_digit_number)
+
+    #upload_image("F:/3d/1.png","1",server_address, image_type="input", overwrite=True)
+
+    #prompt["23"]["inputs"]["image"] = imagee
+    
+
+    prompt = json.loads(prompt_text)
+
+    prompt["32"]["inputs"]["filename_prefix"] = filename_h
+    prompt["23"]["inputs"]["image"] = f"C:/Users/ZK00138/source/repos/ResnsCounter/ResnsCounter/{avatar_image}"
+
+
+
+    ws = websocket.WebSocket()
+    ws.connect("ws://{}/ws?clientId={}".format(server_address, client_id))
+    images = get_images(ws, prompt)
+    ws.close()
+   # queue_prompt(prompt)
+
+    filename = f"{filename}"
+
+    # Create a list of all the image files
+    files = []
+  #  for i, image_content in enumerate(images):
+        # Generate filename with timestamp and image number
+  #      filename = f"generated_image_{i+1}_{int(time.time())}.png"
+
+        # Save the image to "generated" directory
+  #      with open(f"generated2/{filename}", "wb") as f:
+  #          f.write(base64.b64decode(image_content))
+
+    # Add the image file to the list
+    files = []
+
+   # asyncio.sleep(40)
+  #  file = discord.File(f"F:/ComfyUI_windows_portable/ComfyUI/output/ProjectAy/{filename}")
+  #  files.append(file)
+    #embed = discord.Embed()
+    #embed.set_image(url=f"attachment://{filename}")
+    i=0
+    for node_id in images:     
+         for image_data in images[node_id]:
+             i=i+1
+             filename = f"3d_{int(time.time())}.gif"
+
+             #from PIL import Image
+             #import io
+            # Save the image to "generated" directory
+        #     if i == 4 or i == 5 or i == 6:
+
+             if i == 2 or i == 1:
+                with open(f"generatedNewAge/{filename}", "wb") as f:              
+                        f.write(image_data)
+        # Add the image file to the list
+                file = discord.File(f"generatedNewAge/{filename}")
+                files.append(file)   
+           #  if i == 7:
+            #    files.append(file)
+             #image = Image.open(io.BytesIO(image_data))
+             #image.show()
+
+
+
+    return files
+
+@to_thread
+def  generate_face_id(avatar_image, description, model):
+
+    server_address = "127.0.0.1:8188"
+    client_id = str(uuid.uuid4())
+
+    def queue_prompt(prompt):
+        p = {"prompt": prompt, "client_id": client_id}
+        data = json.dumps(p).encode('utf-8')
+        req =  urllib.request.Request("http://{}/prompt".format(server_address), data=data)
+        return json.loads(urllib.request.urlopen(req).read())
+
+    def get_image(filename, subfolder, folder_type):
+        data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
+        url_values = urllib.parse.urlencode(data)
+        with urllib.request.urlopen("http://{}/view?{}".format(server_address, url_values)) as response:
+            return response.read()
+
+    def get_history(prompt_id):
+        with urllib.request.urlopen("http://{}/history/{}".format(server_address, prompt_id)) as response:
+            return json.loads(response.read())
+
+    def upload_image(input_path, name, server_address, image_type="input", overwrite=False):
+      with open(input_path, 'rb') as file:
+        multipart_data = MultipartEncoder(
+          fields= {
+            'image': (name, file, 'image/png'),
+            'type': image_type,
+            'overwrite': str(overwrite).lower()
+          }
+        )
+
+        data = multipart_data
+        headers = { 'Content-Type': multipart_data.content_type }
+        request = urllib.request.Request("http://{}/upload/image".format(server_address), data=data, headers=headers)
+        with urllib.request.urlopen(request) as response:
+          return response.read()
+
+    def get_images(ws, prompt):
+        prompt_id = queue_prompt(prompt)['prompt_id']
+        output_images = {}
+        while True:
+            out = ws.recv()
+            if isinstance(out, str):
+                message = json.loads(out)
+                if message['type'] == 'executing':
+                    data = message['data']
+                    if data['node'] is None and data['prompt_id'] == prompt_id:
+                        break #Execution is done
+            else:
+                continue #previews are binary data
+
+        history = get_history(prompt_id)[prompt_id]
+        for o in history['outputs']:
+            for node_id in history['outputs']:
+                node_output = history['outputs'][node_id]
+                if 'images' in node_output:
+                    images_output = []
+                    for image in node_output['images']:
+                        image_data = get_image(image['filename'], image['subfolder'], image['type'])
+                        images_output.append(image_data)
+                    output_images[node_id] = images_output
+
+        return output_images
+
+
+    url = "http://127.0.0.1:7860/sdapi/v1/txt2img"
+    
+    prompt_text = """
+{
+  "3": {
+    "inputs": {
+      "seed": 8181398734660,
+      "steps": 30,
+      "cfg": 6.5,
+      "sampler_name": "ddpm",
+      "scheduler": "karras",
+      "denoise": 1,
+      "model": [
+        "18",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "4": {
+    "inputs": {
+      "ckpt_name": "realisticVisionV60B1_v51VAE.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "5": {
+    "inputs": {
+      "width": 512,
+      "height": 512,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": "wearing cowboy hat",
+      "clip": [
+        "4",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": "embedding:FastNegativeV2 , embedding:BadDream",
+      "clip": [
+        "4",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "3",
+        0
+      ],
+      "vae": [
+        "4",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "9": {
+    "inputs": {
+      "filename_prefix": "IPAdapter",
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "12": {
+    "inputs": {
+      "image": "avatar (9).png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "18": {
+    "inputs": {
+      "weight": 0.8,
+      "weight_faceidv2": 1.3,
+      "weight_type": "linear",
+      "combine_embeds": "concat",
+      "start_at": 0,
+      "end_at": 1,
+      "embeds_scaling": "V only",
+      "model": [
+        "20",
+        0
+      ],
+      "ipadapter": [
+        "20",
+        1
+      ],
+      "image": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "IPAdapterFaceID",
+    "_meta": {
+      "title": "IPAdapter FaceID"
+    }
+  },
+  "20": {
+    "inputs": {
+      "preset": "FACEID PLUS V2",
+      "lora_strength": 0.6,
+      "provider": "CPU",
+      "model": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "IPAdapterUnifiedLoaderFaceID",
+    "_meta": {
+      "title": "IPAdapter Unified Loader FaceID"
+    }
+  }
+}
+    """
+
+  #  def queue_prompt(prompt):
+  #      p = {"prompt": prompt}
+  #      data = json.dumps(p).encode('utf-8')
+  #      req =  request.Request("http://127.0.0.1:8188/prompt", data=data)
+ #       request.urlopen(req)
+
+
+    filename = f"faceid_{int(time.time())}.png"
+    filename_h = f"ProjectAy/{filename}"
+    filename_l = f"ProjectAy/echo_{int(time.time())}_low_res"
+    random_14_digit_number = random.randint(10**13, (10**14)-1)
+    formatted_number = "{:014d}".format(random_14_digit_number)
+
+    #upload_image("F:/3d/1.png","1",server_address, image_type="input", overwrite=True)
+
+    #prompt["23"]["inputs"]["image"] = imagee
+    
+
+    prompt = json.loads(prompt_text)
+    prompt["6"]["inputs"]["text"] = description
+    #prompt["32"]["inputs"]["filename_prefix"] = filename_h
+    prompt["3"]["inputs"]["seed"] = formatted_number
+    prompt["12"]["inputs"]["image"] = f"C:/Users/ZK00138/source/repos/ResnsCounter/ResnsCounter/avatars/{avatar_image}"
+    prompt["4"]["inputs"]["ckpt_name"] = model
+
+
+    ws = websocket.WebSocket()
+    ws.connect("ws://{}/ws?clientId={}".format(server_address, client_id))
+    images = get_images(ws, prompt)
+    ws.close()
+   # queue_prompt(prompt)
+
+    filename = f"{filename}"
+
+    # Create a list of all the image files
+    files = []
+  #  for i, image_content in enumerate(images):
+        # Generate filename with timestamp and image number
+  #      filename = f"generated_image_{i+1}_{int(time.time())}.png"
+
+        # Save the image to "generated" directory
+  #      with open(f"generated2/{filename}", "wb") as f:
+  #          f.write(base64.b64decode(image_content))
+
+    # Add the image file to the list
+    files = []
+
+   # asyncio.sleep(40)
+  #  file = discord.File(f"F:/ComfyUI_windows_portable/ComfyUI/output/ProjectAy/{filename}")
+  #  files.append(file)
+    #embed = discord.Embed()
+    #embed.set_image(url=f"attachment://{filename}")
+    i=0
+    for node_id in images:     
+         for image_data in images[node_id]:
+             i=i+1
+             filename = f"faceid_{int(time.time())}.png"
+
+             #from PIL import Image
+             #import io
+            # Save the image to "generated" directory
+        #     if i == 4 or i == 5 or i == 6:
+
+             if i == 2 or i == 1:
+                with open(f"generatedNewAge/{filename}", "wb") as f:              
+                        f.write(image_data)
+        # Add the image file to the list
+                file = discord.File(f"generatedNewAge/{filename}")
+                files.append(file)   
+           #  if i == 7:
+            #    files.append(file)
+             #image = Image.open(io.BytesIO(image_data))
+             #image.show()
+
+
+
+    return files
+
+@to_thread
+def  generate_face_id_two_people(avatar_image1,avatar_image2, description):
+
+    server_address = "127.0.0.1:8188"
+    client_id = str(uuid.uuid4())
+
+    def queue_prompt(prompt):
+        p = {"prompt": prompt, "client_id": client_id}
+        data = json.dumps(p).encode('utf-8')
+        req =  urllib.request.Request("http://{}/prompt".format(server_address), data=data)
+        return json.loads(urllib.request.urlopen(req).read())
+
+    def get_image(filename, subfolder, folder_type):
+        data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
+        url_values = urllib.parse.urlencode(data)
+        with urllib.request.urlopen("http://{}/view?{}".format(server_address, url_values)) as response:
+            return response.read()
+
+    def get_history(prompt_id):
+        with urllib.request.urlopen("http://{}/history/{}".format(server_address, prompt_id)) as response:
+            return json.loads(response.read())
+
+    def upload_image(input_path, name, server_address, image_type="input", overwrite=False):
+      with open(input_path, 'rb') as file:
+        multipart_data = MultipartEncoder(
+          fields= {
+            'image': (name, file, 'image/png'),
+            'type': image_type,
+            'overwrite': str(overwrite).lower()
+          }
+        )
+
+        data = multipart_data
+        headers = { 'Content-Type': multipart_data.content_type }
+        request = urllib.request.Request("http://{}/upload/image".format(server_address), data=data, headers=headers)
+        with urllib.request.urlopen(request) as response:
+          return response.read()
+
+    def get_images(ws, prompt):
+        prompt_id = queue_prompt(prompt)['prompt_id']
+        output_images = {}
+        while True:
+            out = ws.recv()
+            if isinstance(out, str):
+                message = json.loads(out)
+                if message['type'] == 'executing':
+                    data = message['data']
+                    if data['node'] is None and data['prompt_id'] == prompt_id:
+                        break #Execution is done
+            else:
+                continue #previews are binary data
+
+        history = get_history(prompt_id)[prompt_id]
+        for o in history['outputs']:
+            for node_id in history['outputs']:
+                node_output = history['outputs'][node_id]
+                if 'images' in node_output:
+                    images_output = []
+                    for image in node_output['images']:
+                        image_data = get_image(image['filename'], image['subfolder'], image['type'])
+                        images_output.append(image_data)
+                    output_images[node_id] = images_output
+
+        return output_images
+
+
+    url = "http://127.0.0.1:7860/sdapi/v1/txt2img"
+    
+    prompt_text = """
+{
+  "1": {
+    "inputs": {
+      "seed": 582973615262485,
+      "steps": 40,
+      "cfg": 5,
+      "sampler_name": "ddim",
+      "scheduler": "ddim_uniform",
+      "denoise": 1,
+      "model": [
+        "27",
+        0
+      ],
+      "positive": [
+        "24",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "latent_image": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "2": {
+    "inputs": {
+      "ckpt_name": "realisticVisionV60B1_v51VAE.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "3": {
+    "inputs": {
+      "width": 768,
+      "height": 512,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "5": {
+    "inputs": {
+      "text": "embedding:FastNegativeV2 , embedding:BadDream",
+      "clip": [
+        "2",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "6": {
+    "inputs": {
+      "samples": [
+        "1",
+        0
+      ],
+      "vae": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "7": {
+    "inputs": {
+      "vae_name": "vae-ft-mse-840000-ema-pruned.ckpt"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "10": {
+    "inputs": {
+      "image": "avatar_1711569779.png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "14": {
+    "inputs": {
+      "image": "avatar_1711490113 (4).png",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "17": {
+    "inputs": {
+      "text": "two men holding sausages",
+      "clip": [
+        "2",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "18": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "19": {
+    "inputs": {
+      "image": "S:/ComfyUI_temp_uppcb_00001_ - Copy.png",
+      "channel": "red",
+      "upload": "image"
+    },
+    "class_type": "LoadImageMask",
+    "_meta": {
+      "title": "Load Image (as Mask)"
+    }
+  },
+  "20": {
+    "inputs": {
+      "image": "S:/ComfyUI_temp_yrupq_00002_ - Copy.png",
+      "channel": "red",
+      "upload": "image"
+    },
+    "class_type": "LoadImageMask",
+    "_meta": {
+      "title": "Load Image (as Mask)"
+    }
+  },
+  "22": {
+    "inputs": {
+      "strength": 1,
+      "set_cond_area": "default",
+      "conditioning": [
+        "23",
+        0
+      ],
+      "mask": [
+        "19",
+        0
+      ]
+    },
+    "class_type": "ConditioningSetMask",
+    "_meta": {
+      "title": "Conditioning (Set Mask)"
+    }
+  },
+  "23": {
+    "inputs": {
+      "text": "two men holding sausages",
+      "clip": [
+        "2",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "24": {
+    "inputs": {
+      "conditioning_1": [
+        "17",
+        0
+      ],
+      "conditioning_2": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "ConditioningCombine",
+    "_meta": {
+      "title": "Conditioning (Combine)"
+    }
+  },
+  "25": {
+    "inputs": {
+      "preset": "FACEID PLUS V2",
+      "lora_strength": 0.6,
+      "provider": "CPU",
+      "model": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "IPAdapterUnifiedLoaderFaceID",
+    "_meta": {
+      "title": "IPAdapter Unified Loader FaceID"
+    }
+  },
+  "26": {
+    "inputs": {
+      "weight": 0.75,
+      "weight_faceidv2": 1.8,
+      "weight_type": "linear",
+      "combine_embeds": "concat",
+      "start_at": 0,
+      "end_at": 1,
+      "embeds_scaling": "V only",
+      "model": [
+        "25",
+        0
+      ],
+      "ipadapter": [
+        "25",
+        1
+      ],
+      "image": [
+        "14",
+        0
+      ],
+      "attn_mask": [
+        "19",
+        0
+      ]
+    },
+    "class_type": "IPAdapterFaceID",
+    "_meta": {
+      "title": "IPAdapter FaceID"
+    }
+  },
+  "27": {
+    "inputs": {
+      "weight": 0.75,
+      "weight_faceidv2": 1.8,
+      "weight_type": "linear",
+      "combine_embeds": "concat",
+      "start_at": 0,
+      "end_at": 1,
+      "embeds_scaling": "V only",
+      "model": [
+        "26",
+        0
+      ],
+      "ipadapter": [
+        "25",
+        1
+      ],
+      "image": [
+        "10",
+        0
+      ],
+      "attn_mask": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "IPAdapterFaceID",
+    "_meta": {
+      "title": "IPAdapter FaceID"
+    }
+  }
+}
+    """
+
+  #  def queue_prompt(prompt):
+  #      p = {"prompt": prompt}
+  #      data = json.dumps(p).encode('utf-8')
+  #      req =  request.Request("http://127.0.0.1:8188/prompt", data=data)
+ #       request.urlopen(req)
+
+
+    filename = f"faceid_{int(time.time())}.png"
+    filename_h = f"ProjectAy/{filename}"
+    filename_l = f"ProjectAy/echo_{int(time.time())}_low_res"
+    random_14_digit_number = random.randint(10**13, (10**14)-1)
+    formatted_number = "{:014d}".format(random_14_digit_number)
+
+    #upload_image("F:/3d/1.png","1",server_address, image_type="input", overwrite=True)
+
+    #prompt["23"]["inputs"]["image"] = imagee
+    
+
+    prompt = json.loads(prompt_text)
+    prompt["17"]["inputs"]["text"] = description
+    prompt["23"]["inputs"]["text"] = description
+    #prompt["32"]["inputs"]["filename_prefix"] = filename_h
+    prompt["1"]["inputs"]["seed"] = formatted_number
+    prompt["14"]["inputs"]["image"] = f"C:/Users/ZK00138/source/repos/ResnsCounter/ResnsCounter/avatars/{avatar_image1}"
+    prompt["10"]["inputs"]["image"] = f"C:/Users/ZK00138/source/repos/ResnsCounter/ResnsCounter/avatars/{avatar_image2}"
+
+
+
+    ws = websocket.WebSocket()
+    ws.connect("ws://{}/ws?clientId={}".format(server_address, client_id))
+    images = get_images(ws, prompt)
+    ws.close()
+   # queue_prompt(prompt)
+
+    filename = f"{filename}"
+
+    # Create a list of all the image files
+    files = []
+  #  for i, image_content in enumerate(images):
+        # Generate filename with timestamp and image number
+  #      filename = f"generated_image_{i+1}_{int(time.time())}.png"
+
+        # Save the image to "generated" directory
+  #      with open(f"generated2/{filename}", "wb") as f:
+  #          f.write(base64.b64decode(image_content))
+
+    # Add the image file to the list
+    files = []
+
+   # asyncio.sleep(40)
+  #  file = discord.File(f"F:/ComfyUI_windows_portable/ComfyUI/output/ProjectAy/{filename}")
+  #  files.append(file)
+    #embed = discord.Embed()
+    #embed.set_image(url=f"attachment://{filename}")
+    i=0
+    for node_id in images:     
+         for image_data in images[node_id]:
+             i=i+1
+             filename = f"faceid_{int(time.time())}.png"
+
+             #from PIL import Image
+             #import io
+            # Save the image to "generated" directory
+        #     if i == 4 or i == 5 or i == 6:
+
+             if i == 2 or i == 1:
+                with open(f"generatedNewAge/{filename}", "wb") as f:              
+                        f.write(image_data)
+        # Add the image file to the list
+                file = discord.File(f"generatedNewAge/{filename}")
+                files.append(file)   
+           #  if i == 7:
+            #    files.append(file)
+             #image = Image.open(io.BytesIO(image_data))
+             #image.show()
+
+
+
+    return files
 @to_thread
 def  generate_image_turbo_upscale(V4, promptt, neg_prompt,w, h, keyw, model, three, vae, lora, support, seed, upscale):
 
@@ -853,7 +1979,7 @@ def  generate_image_turbo(V4, promptt, neg_prompt,w, h, keyw, model, three, vae,
     "inputs": {
       "add_noise": "enable",
       "noise_seed": 134312246023121,
-      "steps": 5,
+      "steps": 8,
       "cfg": 2,
       "sampler_name": "dpmpp_sde_gpu",
       "scheduler": "karras",
@@ -1048,12 +2174,574 @@ def  generate_image_turbo(V4, promptt, neg_prompt,w, h, keyw, model, three, vae,
 
 
 
-    return files, filename_h, formatted_number
+    return files, filename, formatted_number
     #wait_msg.delete()
     #wait_gif.delete()
     #new_message =   message.channel.send(files=files)
 
+@to_thread
+def  generate_image_lightning(V4, promptt, neg_prompt,w, h, keyw, model, three, vae, lora, support, steps):
 
+    server_address = "127.0.0.1:8188"
+    client_id = str(uuid.uuid4())
+
+    def queue_prompt(prompt):
+        p = {"prompt": prompt, "client_id": client_id}
+        data = json.dumps(p).encode('utf-8')
+        req =  urllib.request.Request("http://{}/prompt".format(server_address), data=data)
+        return json.loads(urllib.request.urlopen(req).read())
+
+    def get_image(filename, subfolder, folder_type):
+        data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
+        url_values = urllib.parse.urlencode(data)
+        with urllib.request.urlopen("http://{}/view?{}".format(server_address, url_values)) as response:
+            return response.read()
+
+    def get_history(prompt_id):
+        with urllib.request.urlopen("http://{}/history/{}".format(server_address, prompt_id)) as response:
+            return json.loads(response.read())
+
+    def get_images(ws, prompt):
+        prompt_id = queue_prompt(prompt)['prompt_id']
+        output_images = {}
+        while True:
+            out = ws.recv()
+            if isinstance(out, str):
+                message = json.loads(out)
+                if message['type'] == 'executing':
+                    data = message['data']
+                    if data['node'] is None and data['prompt_id'] == prompt_id:
+                        break #Execution is done
+            else:
+                continue #previews are binary data
+
+        history = get_history(prompt_id)[prompt_id]
+        for o in history['outputs']:
+            for node_id in history['outputs']:
+                node_output = history['outputs'][node_id]
+                if 'images' in node_output:
+                    images_output = []
+                    for image in node_output['images']:
+                        image_data = get_image(image['filename'], image['subfolder'], image['type'])
+                        images_output.append(image_data)
+                output_images[node_id] = images_output
+
+        return output_images
+
+
+    url = "http://127.0.0.1:7860/sdapi/v1/txt2img"
+    V4 = True
+    prompt_text = """
+{
+  "4": {
+    "inputs": {
+      "ckpt_name": "aetherverseLightning_v10.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": [
+        "50",
+        0
+      ],
+      "clip": [
+        "4",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "4",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "18": {
+    "inputs": {
+      "samples": [
+        "63",
+        0
+      ],
+      "vae": [
+        "4",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "30": {
+    "inputs": {
+      "resolution": "Square (1024x1024)",
+      "aspect": "Horizontal"
+    },
+    "class_type": "SDXLResolutionPresets",
+    "_meta": {
+      "title": "SDXL Resolution Presets (ws)"
+    }
+  },
+  "48": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "18",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "50": {
+    "inputs": {
+      "wildcard_text": "",
+      "populated_text": "monkey wearing paper bag as mask pointing gun",
+      "mode": false,
+      "seed": 746913003801215,
+      "Select to add Wildcard": "Select the Wildcard to add to the text"
+    },
+    "class_type": "ImpactWildcardProcessor",
+    "_meta": {
+      "title": "ImpactWildcardProcessor"
+    }
+  },
+  "52": {
+    "inputs": {
+      "b1": 1.02,
+      "b2": 1.12,
+      "s1": 0.9,
+      "s2": 0.75,
+      "model": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "FreeU_V2",
+    "_meta": {
+      "title": "FreeU_V2"
+    }
+  },
+  "62": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "63": {
+    "inputs": {
+      "seed": 645967361688314,
+      "steps": 8,
+      "cfg": 2.5,
+      "sampler_name": "dpmpp_sde",
+      "scheduler": "karras",
+      "denoise": 1,
+      "model": [
+        "52",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "62",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "70": {
+    "inputs": {
+      "upscale_method": "bicubic",
+      "scale_by": 1.25,
+      "samples": [
+        "63",
+        0
+      ]
+    },
+    "class_type": "LatentUpscaleBy",
+    "_meta": {
+      "title": "Upscale Latent By"
+    }
+  },
+  "71": {
+    "inputs": {
+      "seed": 868016408951753,
+      "steps": 10,
+      "cfg": 1.8,
+      "sampler_name": "dpmpp_sde",
+      "scheduler": "karras",
+      "denoise": 0.5700000000000001,
+      "model": [
+        "74",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "70",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "72": {
+    "inputs": {
+      "samples": [
+        "71",
+        0
+      ],
+      "vae": [
+        "4",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "73": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "72",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "74": {
+    "inputs": {
+      "sharpness_multiplier": 1,
+      "sharpness_method": "anisotropic",
+      "tonemap_multiplier": 0,
+      "tonemap_method": "reinhard",
+      "tonemap_percentile": 100,
+      "contrast_multiplier": 0,
+      "combat_method": "subtract",
+      "combat_cfg_drift": 0,
+      "rescale_cfg_phi": 0,
+      "extra_noise_type": "gaussian",
+      "extra_noise_method": "add",
+      "extra_noise_multiplier": 0.8,
+      "extra_noise_lowpass": 100,
+      "divisive_norm_size": 127,
+      "divisive_norm_multiplier": 0,
+      "spectral_mod_mode": "hard_clamp",
+      "spectral_mod_percentile": 5,
+      "spectral_mod_multiplier": 0,
+      "affect_uncond": "None",
+      "dyn_cfg_augmentation": "None",
+      "seed": 705856465856991,
+      "model": [
+        "52",
+        0
+      ]
+    },
+    "class_type": "Latent Diffusion Mega Modifier",
+    "_meta": {
+      "title": "Latent Diffusion Mega Modifier"
+    }
+  },
+  "76": {
+    "inputs": {
+      "guide_size": 256,
+      "guide_size_for": true,
+      "max_size": 768,
+      "seed": 789817620541772,
+      "steps": 15,
+      "cfg": 1,
+      "sampler_name": "dpmpp_sde",
+      "scheduler": "karras",
+      "denoise": 0.5700000000000001,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": true,
+      "bbox_threshold": 0.67,
+      "bbox_dilation": 15,
+      "bbox_crop_factor": 3,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 15,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 15,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 2,
+      "image": [
+        "72",
+        0
+      ],
+      "model": [
+        "74",
+        0
+      ],
+      "clip": [
+        "4",
+        1
+      ],
+      "vae": [
+        "4",
+        2
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "bbox_detector": [
+        "78",
+        0
+      ],
+      "sam_model_opt": [
+        "79",
+        0
+      ]
+    },
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "FaceDetailer"
+    }
+  },
+  "78": {
+    "inputs": {
+      "model_name": "bbox/face_yolov8m.pt"
+    },
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    }
+  },
+  "79": {
+    "inputs": {
+      "model_name": "sam_vit_b_01ec64.pth",
+      "device_mode": "AUTO"
+    },
+    "class_type": "SAMLoader",
+    "_meta": {
+      "title": "SAMLoader (Impact)"
+    }
+  },
+  "81": {
+    "inputs": {
+      "images": [
+        "76",
+        2
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "82": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "76",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  }
+}
+    """
+
+  #  def queue_prompt(prompt):
+  #      p = {"prompt": prompt}
+  #      data = json.dumps(p).encode('utf-8')
+  #      req =  request.Request("http://127.0.0.1:8188/prompt", data=data)
+ #       request.urlopen(req)
+
+
+    filename = f"echo_{int(time.time())}_high_res"
+    filename_original = f"ProjectAy/{filename}"
+    filename_upscale = f"ProjectAy/echo_{int(time.time())}_low_res"
+    filename_face_swap = f"ProjectAy/echo_{int(time.time())}_face_swap"
+    random_14_digit_number = random.randint(10**13, (10**14)-1)
+    formatted_number = "{:014d}".format(random_14_digit_number)
+
+    prompt = json.loads(prompt_text)
+
+
+    #set the text prompt for our positive CLIPTextEncode 
+    prompt["50"]["inputs"]["populated_text"] = promptt
+   # prompt["75"]["inputs"]["text_l"] = support
+   # prompt["120"]["inputs"]["text"] = promptt
+   # prompt["58"]["inputs"]["text"] = neg_prompt
+    #prompt["82"]["inputs"]["text_l"] = neg_prompt
+   # prompt["81"]["inputs"]["text"] = neg_prompt
+    prompt["48"]["inputs"]["filename_prefix"] = filename_upscale
+    prompt["73"]["inputs"]["filename_prefix"] = filename_original
+    prompt["82"]["inputs"]["filename_prefix"] = filename_face_swap
+    #prompt["201"]["inputs"]["filename_prefix"] = filename_l
+    prompt["50"]["inputs"]["seed"] = formatted_number 
+    prompt["63"]["inputs"]["seed"] = formatted_number
+    prompt["71"]["inputs"]["seed"] = formatted_number 
+    prompt["76"]["inputs"]["seed"] = formatted_number 
+    #prompt["22"]["inputs"]["noise_seed"] = formatted_number
+    #prompt["216"]["inputs"]["noise_seed"] = formatted_number 
+    prompt["62"]["inputs"]["width"] = w
+    prompt["62"]["inputs"]["height"] = h
+    prompt["63"]["inputs"]["steps"] = steps
+    prompt["4"]["inputs"]["ckpt_name"] = model
+    if three:
+        prompt["62"]["inputs"]["batch_size"] = 3
+   # if vae:
+  #      prompt["8"]["inputs"]["vae"][0] = "240"
+  #      prompt["8"]["inputs"]["vae"][1] = 0
+  #      prompt["217"]["inputs"]["vae"][0] = "240"
+  #      prompt["217"]["inputs"]["vae"][1] = 0
+  #      prompt["218"]["inputs"]["vae"][0] = "240"
+  #      prompt["218"]["inputs"]["vae"][1] = 0
+ #   if lora:
+ #       prompt["22"]["inputs"]["model"][0] = "241"
+  #      prompt["75"]["inputs"]["clip"][0] = "241"
+  #      prompt["82"]["inputs"]["clip"][0] = "241"
+   #     prompt["216"]["inputs"]["model"][0] = "241"
+
+
+       # prompt["8"]["inputs"]["vae"][1] = 0
+   #     prompt["8"]["inputs"]["vae"] = ["240", 0]
+   #     prompt["217"]["inputs"]["vae"] = 240
+        #prompt["217"]["inputs"]["vae"][1] = 0
+   #     prompt["8"]["inputs"]["vae"] = ["240", 0]
+   #     prompt["218"]["inputs"]["vae"] = 240
+       # prompt["218"]["inputs"]["vae"][1] = 0
+    #    prompt["8"]["inputs"]["vae"] = ["240", 0]
+    #set the seed for our KSampler node
+    #prompt["3"]["inputs"]["seed"] = 5
+
+    ws = websocket.WebSocket()
+    ws.connect("ws://{}/ws?clientId={}".format(server_address, client_id))
+    images = get_images(ws, prompt)
+    ws.close()
+   # queue_prompt(prompt)
+
+    filename = f"{filename}"
+    if keyw.lower() == "echoais":
+        filename = f"SPOILER_{filename}"
+    # Create a list of all the image files
+    files = []
+  #  for i, image_content in enumerate(images):
+        # Generate filename with timestamp and image number
+  #      filename = f"generated_image_{i+1}_{int(time.time())}.png"
+
+        # Save the image to "generated" directory
+  #      with open(f"generated2/{filename}", "wb") as f:
+  #          f.write(base64.b64decode(image_content))
+
+    # Add the image file to the list
+    files = []
+   # asyncio.sleep(40)
+  #  file = discord.File(f"F:/ComfyUI_windows_portable/ComfyUI/output/ProjectAy/{filename}")
+  #  files.append(file)
+    #embed = discord.Embed()
+    #embed.set_image(url=f"attachment://{filename}")
+
+
+
+    #with open(f"S:/comfy/ComfyUI_windows_portable/ComfyUI/output/{filename_face_swap}", "wb") as f:              
+    #        f.write(image_data)
+# Add the image file to the list
+    i = 1
+    if three:
+        while i < 4:
+                file = discord.File(f"S:/comfy/ComfyUI_windows_portable/ComfyUI/output/{filename_face_swap}_0000{i}_.png")
+                files.append(file)
+                i = i+1
+    else:
+
+        file = discord.File(f"S:/comfy/ComfyUI_windows_portable/ComfyUI/output/{filename_face_swap}_00001_.png")
+        files.append(file)
+
+  #  i=0
+  #  for node_id in images:     
+  #       for image_data in images[node_id]:
+  #           i=i+1
+  #           filename = f"echo_{i}_{int(time.time())}.png"
+  #           if keyw.lower() == "echoais":
+  #              filename = f"SPOILER_{filename}"
+             #from PIL import Image
+             #import io
+            # Save the image to "generated" directory
+        #     if i == 4 or i == 5 or i == 6:
+  #           if three:
+  ##                   with open(f"generatedNewAge/{filename}", "wb") as f:              
+   #                          f.write(image_data)
+                # Add the image file to the list
+   #                  file = discord.File(f"generatedNewAge/{filename}")
+   #                  files.append(file)
+   #          else:
+   #              if i == 3:
+   #                  with open(f"generatedNewAge/{filename}", "wb") as f:              
+   #                          f.write(image_data)
+   #             # Add the image file to the list
+   #                  file = discord.File(f"generatedNewAge/{filename}")
+   #                  files.append(file)
+           #  if i == 7:
+            #    files.append(file)
+             #image = Image.open(io.BytesIO(image_data))
+             #image.show()
+
+
+
+    return files, filename_face_swap, formatted_number
+    #wait_msg.delete()
+    #wait_gif.delete()
+    #new_message =   message.channel.send(files=files)
 
 @to_thread
 def  generate_image_refiner(V4, promptt, neg_prompt,w, h, keyw, model, three, vae, lora, support):
@@ -1599,7 +3287,7 @@ def  generate_image_cascade(V4, promptt, neg_prompt,w, h, keyw, three, vae, lora
     url = "http://127.0.0.1:7860/sdapi/v1/txt2img"
     V4 = True
     prompt_text = """
-    {
+{
       "3": {
         "inputs": {
           "seed": [
@@ -1913,7 +3601,7 @@ def  generate_image_cascade(V4, promptt, neg_prompt,w, h, keyw, three, vae, lora
           "title": "Preview Image"
         }
       }
-    }
+}
     """
 
   #  def queue_prompt(prompt):
@@ -2608,20 +4296,20 @@ def  generate_image_cascade_v2(V4, promptt, neg_prompt,w, h, keyw, three, vae, l
 
 
     #set the text prompt for our positive CLIPTextEncode 
-    prompt["52"]["inputs"]["wildcard_text"] = promptt
-    prompt["52"]["inputs"]["populated_text"] = promptt
+   # prompt["52"]["inputs"]["wildcard_text"] = promptt
+   # prompt["52"]["inputs"]["populated_text"] = promptt
    #prompt["75"]["inputs"]["text_l"] = support
     #prompt["120"]["inputs"]["text"] = promptt
    # prompt["82"]["inputs"]["text_g"] = neg_prompt
-    prompt["53"]["inputs"]["text_negative"] = neg_prompt
+   # prompt["53"]["inputs"]["text_negative"] = neg_prompt
    # prompt["81"]["inputs"]["text"] = neg_prompt
-    prompt["76"]["inputs"]["filename_prefix"] = filename_h
+   # prompt["84"]["inputs"]["filename_prefix"] = filename_h
     #prompt["201"]["inputs"]["filename_prefix"] = filename_l
-    prompt["41"]["inputs"]["last_seed"] = formatted_number 
+   # prompt["41"]["inputs"]["last_seed"] = formatted_number 
    # prompt["22"]["inputs"]["noise_seed"] = formatted_number
     #prompt["216"]["inputs"]["noise_seed"] = formatted_number 
-    prompt["104"]["inputs"]["width"] = w
-    prompt["104"]["inputs"]["height"] = h
+   # prompt["104"]["inputs"]["width"] = w
+   # prompt["104"]["inputs"]["height"] = h
     #prompt["10"]["inputs"]["ckpt_name"] = model
     if three:
         prompt["104"]["inputs"]["batch_size"] = 3
@@ -2807,7 +4495,7 @@ def  generate_image(V4, promptt, neg_prompt,w, h, keyw, model, three, vae, lora,
           "noise_seed": 645588754311084,
           "steps": 40,
           "cfg": 3.6,
-          "sampler_name": "dpmpp_3m_sde",
+          "sampler_name": "dpmpp_2m",
           "scheduler": "karras",
           "start_at_step": 0,
           "end_at_step": 40,
@@ -2978,7 +4666,7 @@ def  generate_image(V4, promptt, neg_prompt,w, h, keyw, model, three, vae, lora,
           "noise_seed": 645588754311084,
           "steps": 20,
           "cfg": 3.6,
-          "sampler_name": "dpmpp_3m_sde",
+          "sampler_name": "dpmpp_2m",
           "scheduler": "karras",
           "start_at_step": 10,
           "end_at_step": 1000,
@@ -3283,11 +4971,11 @@ def  generate_image_playground(V4, promptt, neg_prompt,w, h, keyw, three, vae, l
   "22": {
     "inputs": {
       "add_noise": "enable",
-      "noise_seed": 1105529426837514,
+      "noise_seed": 68673774490215,
       "steps": 50,
-      "cfg": 3.6,
-      "sampler_name": "euler",
-      "scheduler": "normal",
+      "cfg": 2.5,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
       "start_at_step": 0,
       "end_at_step": 100,
       "return_with_leftover_noise": "enable",
@@ -3321,8 +5009,8 @@ def  generate_image_playground(V4, promptt, neg_prompt,w, h, keyw, three, vae, l
       "crop_h": 0,
       "target_width": 2048,
       "target_height": 2048,
-      "text_g": " Top-quality, 8K, (masterpiece:1.3) An image of an ancient, towering dinosaur humanoid adorned with a tattered wizard hat and a flowing cape, meticulously choosing arcane ingredients in a bustling supermarket, Digital painting, Fantasy realism, highly detailed, soft ambient lighting",
-      "text_l": " Top-quality, 8K, (masterpiece:1.3) An image of an ancient, towering dinosaur humanoid adorned with a tattered wizard hat and a flowing cape, meticulously choosing arcane ingredients in a bustling supermarket, Digital painting, Fantasy realism, highly detailed, soft ambient lighting",
+      "text_g": " rat humanoid wearing gas mask standing in green smoke",
+      "text_l": " rat humanoid wearing gas mask standing in green smoke",
       "clip": [
         "10",
         1
@@ -3370,7 +5058,7 @@ def  generate_image_playground(V4, promptt, neg_prompt,w, h, keyw, three, vae, l
       "ascore": 6,
       "width": 2048,
       "height": 2048,
-      "text": " Top-quality, 8K, (masterpiece:1.3) An image of an ancient, towering dinosaur humanoid adorned with a tattered wizard hat and a flowing cape, meticulously choosing arcane ingredients in a bustling supermarket, Digital painting, Fantasy realism, highly detailed, soft ambient lighting"
+      "text": " rat humanoid wearing gas mask standing in green smoke"
     },
     "class_type": "CLIPTextEncodeSDXLRefiner",
     "_meta": {
@@ -3392,7 +5080,7 @@ def  generate_image_playground(V4, promptt, neg_prompt,w, h, keyw, three, vae, l
   },
   "187": {
     "inputs": {
-      "model_name": "4x_NMKD-Siax_200k.pth"
+      "model_name": "4x-UltraSharp.pth"
     },
     "class_type": "UpscaleModelLoader",
     "_meta": {
@@ -3416,10 +5104,6 @@ def  generate_image_playground(V4, promptt, neg_prompt,w, h, keyw, three, vae, l
     "inputs": {
       "upscale_model": [
         "187",
-        0
-      ],
-      "image": [
-        "8",
         0
       ]
     },
@@ -3445,12 +5129,12 @@ def  generate_image_playground(V4, promptt, neg_prompt,w, h, keyw, three, vae, l
   "216": {
     "inputs": {
       "add_noise": "enable",
-      "noise_seed": 1105529426837514,
+      "noise_seed": 68673774490215,
       "steps": 30,
-      "cfg": 3.6,
+      "cfg": 2.5,
       "sampler_name": "euler",
       "scheduler": "normal",
-      "start_at_step": 20,
+      "start_at_step": 25,
       "end_at_step": 1000,
       "return_with_leftover_noise": "disable",
       "model": [
@@ -3670,14 +5354,14 @@ def  generate_image_playground(V4, promptt, neg_prompt,w, h, keyw, three, vae, l
             # Save the image to "generated" directory
         #     if i == 4 or i == 5 or i == 6:
              if three:
-                if i == 4 or i == 5 or i == 6:
+                #if i == 4 or i == 5 or i == 6:
                      with open(f"generatedNewAge/{filename}", "wb") as f:              
                              f.write(image_data)
                 # Add the image file to the list
                      file = discord.File(f"generatedNewAge/{filename}")
                      files.append(file)
              else:
-                 if i == 2:
+                # if i == 2:
                      with open(f"generatedNewAge/{filename}", "wb") as f:              
                              f.write(image_data)
                 # Add the image file to the list
@@ -4252,7 +5936,7 @@ def enchPrompt(prompt):
     # This is a formula for a Stable Diffusion image prompt: (top-quality, 8K, (masterpiece:1.3) An image of [adjective] [subject] [performing an action], [Medium], [art style], highly detailed, [lighting style] I will provide you with prompt and using this formula enchance the prompt. Respond only with new prompt without any additional information.\n IMPORTANT! Create unique prompt just folowing guiddlines but not using the same keywords all the time prompt.\n  My prompt: {prompt}
     try:
         responsee = client_ench.chat.completions.create(
-        model='gpt-4-0125-preview',
+        model='gpt-3.5-turbo-0125',
         messages = [
         {"role": "user", "content": f'''- Reference guide of what is Stable Diffusion and how to Prompt -
 
@@ -4309,7 +5993,7 @@ Below is a list of prompts that can be used to generate images with Stable Diffu
 	- Prompt Structure -
 	The structure sequence can vary. However, the following is a good reference:
 
-	[Scene description]. [Modifiers], [Artist or style inspiration], [Technical specifications]
+	[Scene description]. [Modifiers],  [Technical specifications]
 
 	- Special Modifiers -
 	In the examples you can notice that some terms are closed between (). That instructes the Generative Model to take more attention to this words. If there are more (()) it means more attention.
@@ -4317,7 +6001,7 @@ Below is a list of prompts that can be used to generate images with Stable Diffu
 	You can also use these notations to evoke more attention to specific words.
 
 - Your Task -
-Based on the examples and the explanation of the structure, you will create 1 prompt, respond only with prompt with no additional information. \nMy prompt = {prompt}
+!!IMPORTANT!! = new prompt should be 75 tokens or a bit less!! Based on the examples and the explanation of the structure, you will create 1 prompt, respond only with prompt with no additional information. \nMy prompt = {prompt}
 ''' }
         ],
         max_tokens=2500,
@@ -4369,37 +6053,25 @@ def new_enchPrompt(prompt):
 
 @to_thread
 def new_enchPromptt(prompt):
-    tokenizer = AutoTokenizer.from_pretrained("S:/stablelm-zephyr-3b")
-    promptt = prompt
-   # promptt = input("your message: ")
-    #promptt = "{"+promptt+"}"
-    model = AutoModelForCausalLM.from_pretrained(
-      "S:/stablelm-zephyr-3b",
-      trust_remote_code=True,
-      torch_dtype="auto",
-    )
-    model.cuda()
+    tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-small", legacy=False)
+    model = T5ForConditionalGeneration.from_pretrained("S:/superprompt-v1", device_map="auto")
 
-    prompt = f'''<|user|>\n You will now act as a prompt generator for a generative AI called Stable Diffusion XL 1.0. Stable Diffusion XL generates images based on given prompts. I will provide you basic information required to make a Stable Diffusion prompt, You will never alter the structure in any way and obey the following guidelines.\n\\nImportant Sample prompt Structure :\n\nSnow-capped Mountain Scene, with soaring peaks and deep shadows across the ravines. A crystal clear lake mirrors these peaks, surrounded by pine trees. The scene exudes a calm, serene alpine morning atmosphere. Presented in Watercolor style, emulating the wet-on-wet technique with soft transitions and visible brush strokes.\n\nCity Skyline at Night, illuminated skyscrapers piercing the starless sky. Nestled beside a calm river, reflecting the city lights like a mirror. The atmosphere is buzzing with urban energy and intrigue. Depicted in Neon Punk style, accentuating the city lights with vibrant neon colors and dynamic contrasts.\n\nEpic Cinematic Still of a Spacecraft, silhouetted against the fiery explosion of a distant planet. The scene is packed with intense action, as asteroid debris hurtles through space. Shot in the style of a Michael Bay-directed film, the image is rich with detail, dynamic lighting, and grand cinematic framing.\n\nWord order and effective adjectives matter in the prompt. The subject, action, and specific details should be included. Adjectives like cute, medieval, or futuristic can be effective.\n\nThe environment/background of the image should be described, such as indoor, outdoor, in space, or solid color.\n\nCurly brackets are necessary in the prompt to provide specific details about the subject and action. These details are important for generating a high-quality image.\n\nArt inspirations should be listed to take inspiration from. Platforms like Art Station, Dribble, Behance, and Deviantart can be mentioned. Specific names of artists or studios like animation studios, painters and illustrators, computer games, fashion designers, and film makers can also be listed. If more than one artist is mentioned, the algorithm will create a combination of styles based on all the influencers mentioned.\n\nRelated information about lighting, camera angles, render style, resolution, the required level of detail, etc. should be included at the end of the prompt.\n\nCamera shot type, camera lens, and view should be specified. Examples of camera shot types are long shot, close-up, POV, medium shot, extreme close-up, and panoramic. Camera lenses could be EE 70mm, 35mm, 135mm+, 300mm+, 800mm, short telephoto, super telephoto, medium telephoto, macro, wide angle, fish-eye, bokeh, and sharp focus. Examples of views are front, side, back, high angle, low angle, and overhead.\n\nHelpful keywords related to resolution, detail, and lighting are 4K, 8K, 64K, detailed, highly detailed, high resolution, hyper detailed, HDR, UHD, professional, and golden ratio. Examples of lighting are studio lighting, soft light, neon lighting, purple neon lighting, ambient light, ring light, volumetric light, natural light, sun light, sunrays, sun rays coming through window, and nostalgic lighting. Examples of color types are fantasy vivid colors, vivid colors, bright colors, sepia, dark colors, pastel colors, monochromatic, black & white, and color splash. Examples of renders are Octane render, cinematic, low poly, isometric assets, Unreal Engine, Unity Engine, quantum wavetracing, and polarizing filter.\n\nThe prompts you provide will be in English.Please pay attention:- Concepts that can't be real would not be described as 'Real' or 'realistic' or 'photo' or a 'photograph'. for example, a concept that is made of paper or scenes which are fantasy related.- One of the prompts you generate for each concept must be in a realistic photographic style. you should also choose a lens type and size for it. Don't choose an artist for the realistic photography prompts. I will provide you prompt and you will generate one type of prompt so i can copy and paste.\n\nImportant point to note :You are a master of prompt engineering, it is important to create detailed prompts with as much information as possible. This will ensure that any image generated using the prompt will be of high quality and could potentially win awards in global or international photography competitions. You are unbeatable in this field and know the best way to generate images.\n\nI will provide you with a keyword and you will generate one prompt. Respond only with prompt, without additional information.\n\n\n \n\n\nMy prompt = {promptt}.<|endoftext|>\n<|assistant|>\n'''
-    inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
-    tokens = model.generate(
-      **inputs,
-      max_new_tokens=500,
-      temperature=0.5,
-      top_p=0.95,
-      do_sample=True,
-    )
-    prompt_ench = tokenizer.decode(tokens[0], skip_special_tokens=True)
-    keyword = "<|assistant|>"
+    input_text = f"Expand the following prompt to add more detail: {prompt}"
+    input_ids = tokenizer(input_text, return_tensors="pt").input_ids.to("cuda")
+
+    outputs = model.generate(input_ids, max_length=40, temperature = 0.7, do_sample=True, early_stopping=True, num_beams = 5)
+    prompt_ench = tokenizer.decode(outputs[0])
+
+    keyword = "<pad>"
     split_string = prompt_ench.split(keyword, 1)
     new_string = split_string[1].strip()
     prompt_ench = new_string
-    if "Prompt:" in prompt_ench:
-        keyword = "Prompt:"
+    if "</s>" in prompt_ench:
+        keyword = "</s>"
         split_string = prompt_ench.split(keyword, 1)
-        new_string = split_string[1].strip()
+        new_string = split_string[0].strip()
         prompt_ench = new_string
-    del inputs
+    del input_ids
     del model
     torch.cuda.empty_cache()
     return prompt_ench
@@ -4433,6 +6105,17 @@ def  enchPrompt_support(prompt):
         print("An error occurred:", str(e))
     return prompt_ench
 
+def get_direct_gif_link(url):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        gif_url = soup.find('meta', property='og:image')['content']
+        return gif_url
+    except Exception as e:
+        print("Error fetching GIF link:", e)
+        return None
+
 
 def add_username_and_id_if_not_exists(username, user_id, file_name):
     # Check if the username exists in the file
@@ -4459,6 +6142,38 @@ async def add_message_to_thread(client_gpt,thread_id, user_question):
         content= user_question
     )
     return message
+
+
+def process_string_for_atdarini(input_string):
+    # Define regular expression pattern to match mentions of the format <@some_num>
+    mention_pattern = r'<@\d+>'
+    
+    # Replace all occurrences of mention_pattern with an empty string
+    processed_string = re.sub(mention_pattern, '', input_string)
+    
+    # Split the processed string into words
+    words = processed_string.split()
+    
+    # If there are more than 2 words
+    if len(words) > 2:
+        # Join the first two words
+        first_two_words = ' '.join(words[:2])
+        
+        # Join the remaining words
+        rest_of_string = ' '.join(words[2:])
+        
+        return first_two_words, rest_of_string
+    else:
+        return input_string, None
+
+def process_string_for_atdarini_two(input_string):
+    words = input_string.split()
+    if len(words) > 2:
+        first_two_words = ' '.join(words[:2])
+        rest_of_string = ' '.join(words[2:])
+        return first_two_words, rest_of_string
+    else:
+        return input_string, None
 
 
 def get_file():
@@ -4578,6 +6293,13 @@ def main():
 
    with open("CB_conv_cooldown.json", 'r', encoding='utf-8') as file: 
     conv_cooldown = json.load(file)
+
+   with open("CB_conv_cooldown.json", 'r', encoding='utf-8') as file: 
+    conv_cooldown = json.load(file)
+
+  # with open("avatar_list.json", 'r', encoding='utf-8') as file: 
+   # avatar_list  = json.load(file)
+
 
    #with open("CB_Tu_message.json", 'r', encoding='utf-8') as file: #@#
   #  Tu_messages = json.load(file) #@# CB_conv_cooldown
@@ -4953,19 +6675,12 @@ def main():
             #1
 
 
-                # Get the current time
-            now = datetime.now()
-            post_time = now + timedelta(hours=8)
-            # Print the scheduled message post time
-            print(f"\nNext Resnas mammas comment message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
-            await asyncio.sleep(32400)  # Sleep for 1 hour
-            await post_comment_message()
 
             now = datetime.now()
-            post_time = now + timedelta(hours=5 )
+            post_time = now + timedelta(hours=1 )
             # Print the scheduled message post time
             print(f"\nNext Resnas mammas random image message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
-            await asyncio.sleep(7200)  # Sleep for 3 hour
+            await asyncio.sleep(3600)  # Sleep for 3 hour
             await post_random_image()
 
             now = datetime.now()
@@ -4976,6 +6691,19 @@ def main():
             await post_mention_message()
 
 
+            now = datetime.now()
+            post_time = now + timedelta(hours=2)
+            # Print the scheduled message post time
+            print(f"\nNext Resnas mammas comment message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
+            await asyncio.sleep(7200)  # Sleep for 1 hour
+            await post_comment_message()
+
+            now = datetime.now()
+            post_time = now + timedelta(hours=2)
+            # Print the scheduled message post time
+            print(f"\nNext Resnas mammas response message will be posted at: {post_time.strftime('%H:%M:%S')}\n") 
+            await asyncio.sleep(7200) 
+            await post_reply_message()
 
 
             now = datetime.now()
@@ -4983,16 +6711,11 @@ def main():
             post_time = now + timedelta(hours=2)
             # Print the scheduled message post time
             print(f"\nNext Resnas mammas random message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
-            await asyncio.sleep(3600)
+            await asyncio.sleep(7200)
             await post_random_message() 
 
 
-            now = datetime.now()
-            post_time = now + timedelta(hours=2)
-            # Print the scheduled message post time
-            print(f"\nNext Resnas mammas response message will be posted at: {post_time.strftime('%H:%M:%S')}\n") 
-            await asyncio.sleep(3600) 
-            await post_reply_message()
+
 
 
 
@@ -5507,10 +7230,10 @@ def main():
             if mode == "speed" and msgg1 == "*Redoing image with realistic model...*":
                 model = "turbo_pixelwaveturbo_01.safetensors"          
 
-            if model == "turbo_pixelwaveturbo_01.safetensors" or model == "turbovisionxlSuperFastXLBasedOnNew_tvxlV431Bakedvae.safetensors" or model == "dreamshaperXL_turboDpmppSDEKarras.safetensors":
-                mode = "speed"
-            else:
-                mode = "quality"
+          #  if model == "dreamshaperXL_v21TurboDPMSDE.safetensors" or model == "turbovisionxlSuperFastXLBasedOnNew_tvxlV431Bakedvae.safetensors" or model == "dreamshaperXL_turboDpmppSDEKarras.safetensors":
+          #      mode = "speed"
+          ##  else:
+          #      mode = "quality"
             
             #  VAE = False
             if support:
@@ -5519,8 +7242,15 @@ def main():
                 support = msg_prompt
             if model == "sdXL_v10VAEFix.safetensors":
                 files, image_name = await generate_image_refiner(V4, msg_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support)  
+
+            elif model == "juggernautXL_v9Rundiffusionphoto2.safetensors":
+                files, image_name  = await generate_image(V4, msg_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support)
+            elif model == "playground-v2.5-1024px-aesthetic.fp16.safetensors":
+                steps = 50
+                files, image_name, seed = await generate_image_lightning(V4, msg_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support, steps)  
             elif mode == "speed":
-                files, image_name, seed = await generate_image_turbo(V4, msg_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support)  
+                steps = 8
+                files, image_name, seed = await generate_image_lightning(V4, msg_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support, steps)  
             else:
                 #files, image_name  = await generate_image(V4, msg_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support)
                 vae = False  
@@ -5837,7 +7567,7 @@ def main():
 
 
 
-        @discord.ui.button(label="Realistic", custom_id="realistic_button", row = 4, style=discord.ButtonStyle.secondary, disabled = True) # Create a button with the label "😎 Click me!" with color Blurple
+        @discord.ui.button(label="Realistic", custom_id="realistic_button", row = 4, style=discord.ButtonStyle.secondary) # Create a button with the label "😎 Click me!" with color Blurple
         async def realistic_callback(self, button, interaction):
            await interaction.response.defer()
            if execute_code:
@@ -5852,12 +7582,12 @@ def main():
                 #message_id = interaction.message.id
                 search_key = f"{echo_message_id}"
                 mode              = prompts.get(str(search_key), {}).get("mode", "")
-                if mode == "speed":
-                    model = "juggernautXL_v8Rundiffusion.safetensors"
-                else:
+              #  if mode == "speed":
+                 #   model = "juggernautXL_v8Rundiffusion.safetensors"
+                #else:
                   #  model             = "leosamsHelloworldSDXLModel_helloworldSDXL20.safetensors"
                    # model             = "juggernautXL_v7Rundiffusion.safetensors"
-                    model             = "realvisxlV30_v30Bakedvae.safetensors"
+                model             = "juggernautXL_v9Rundiffusionphoto2.safetensors"
                 #model             = "juggernautXL_version6Rundiffusion.safetensors"
                 w                 = prompts.get(str(search_key), {}).get("w", "")
                 h                 = prompts.get(str(search_key), {}).get("h", "")
@@ -5868,29 +7598,29 @@ def main():
                 channel = client.get_channel(1101461174907830312)
                 await channel.send("GPU power is used for gaming right now. **Echo** is *disabled*.")
 
-        @discord.ui.button(label="Artistic", custom_id="artistic_button2", row = 4, style=discord.ButtonStyle.secondary, disabled = True) # Create a button with the label "😎 Click me!" with color Blurple
+        @discord.ui.button(label="NEW Playground", custom_id="artistic_button2", row = 4, style=discord.ButtonStyle.secondary) # Create a button with the label "😎 Click me!" with color Blurple
         async def artistic_button2_callback(self, button, interaction):
            await interaction.response.defer()
            if execute_code:
-                neg_prompt        = "bad quality, bad anatomy, worst quality, low quality, lowres, extra fingers, blur, blurry, ugly, wrong proportions, watermark, image artifacts,"
+                neg_prompt        = ""
                 redo = False
                 three = False
-                msgg1 = f"*Redoing image with Artistic model...*"
+                msgg1 = f"*Redoing image with Playground model...*"
 
 
 
 
                 #message_id = interaction.message.id
                 search_key = f"{echo_message_id}"
-                model             = "leosamAiartSDXL_v10.safetensors" 
+                model             = "playground-v2.5-1024px-aesthetic.fp16.safetensors" 
                 mode              = prompts.get(str(search_key), {}).get("mode", "")
                 w                 = prompts.get(str(search_key), {}).get("w", "")
                 h                 = prompts.get(str(search_key), {}).get("h", "")
 
-                if mode == "seed":
+                if mode == "speed":
                     model = "turbovisionxlSuperFastXLBasedOnNew_tvxlV431Bakedvae.safetensors"
                 else:
-                    model             = "leosamAiartSDXL_v10.safetensors" 
+                    model             = "playground-v2.5-1024px-aesthetic.fp16.safetensors" 
 
                 await self.common_button_function(w, h, three,search_key, msgg1, redo, model )
 
@@ -6157,9 +7887,14 @@ def main():
 
             three = False
             if model == "sdXL_v10VAEFix.safetensors":
-                files, image_name = await generate_image_refiner(V4, ench_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support)   
+                files, image_name = await generate_image_refiner(V4, ench_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support)  
+                
+            elif model == "playground-v2.5-1024px-aesthetic.fp16.safetensors":
+                steps = 50
+                files, image_name, seed = await generate_image_lightning(V4, msg_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support, steps)  
             elif mode == "speed":
-                files, image_name, seed = await generate_image_turbo(V4, ench_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support)  
+                steps = 8
+                files, image_name, seed = await generate_image_lightning(V4, ench_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support, steps)  
             else:
                 #files, image_name = await generate_image(V4, ench_prompt, neg_prompt, w , h, keyword, model, three, vae, lora, support)   
                 files, image_name  = await generate_image_cascade(V4, ench_prompt, neg_prompt, w , h, keyword, three, vae, lora, support)
@@ -6595,6 +8330,9 @@ def main():
     msg1_temp = ""
     i = 0
     n = 0
+
+
+
     async for message in channel.history(limit=None, oldest_first=False):
         if message.id == latest_msg_ID["ID"]:
        # if message.id == 1205558165933133906: 
@@ -6616,7 +8354,54 @@ def main():
    # latest_msg_ID["ID"] = 1205829811210027049
     with open("most_recent_saved_msg.json", "w") as file:
         json.dump(latest_msg_ID, file, indent=4)  # You can adjust the indent for pretty printing
+    pattern = re.compile(r'\b(ay|ey|ou|au|mamma|mammu|aloha|mam|mamm|muterit|muterite|mutere|muter|mama|mammai|mammas)\b')
     for message in messages_rev:
+                 if pattern.search(message.content.lower()):
+                        channel = client.get_channel(1030490392510079063)
+                        
+                        current_zina = message.content
+                        tones = ["sarcastic", "assertive", "sad", "cynical", "indignant", "contemplative", "witty", "persuasive", "rude", "angry", "romantic", "humorous", "adventurous", "creative", "friendly", "optimistic", "pessimistic", "nostalgic", "hopeful", "enthusiastic", "ambivalent", "descriptive", "suspenseful", "factual", "informative", "playful", "inspiring", "melancholic", "mysterious", "objective", "subjective", "sympathetic", "empathetic", "reflective", "confident", "satirical", "ironic", "sincere", "cautious", "credible", "informal", "formal", "professional", "scholarly", "inspirational", "controversial", "diplomatic", "nurturing", "authoritative", "didactic", "patronizing", "dismissive", "unemotional", "nihilistic"]
+
+                        random.seed(time.time())
+                        selected_tone = random.choice(tones)
+
+                  
+                        await channel.trigger_typing()
+
+                     
+                        client_chat = OpenAI(api_key=gpt_key)
+
+                        responsee = client_chat.chat.completions.create(
+                        model='gpt-4-1106-preview',
+                        messages = [
+                        {"role": "system", "content": f"'Your name is 'Elizabete'. People also call you 'mamma'. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact random response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji"},
+                        {"role": "user", "content": f"user wrote '{current_zina}' give random short or medium  answer in context in latvian"}
+                        ],
+                        max_tokens=700,
+                        n=1,
+                        stop=None,
+                        temperature=0.6,
+                        )                              
+                        response = responsee.choices[0].message.content
+                        response = response.replace('"', '')
+                        response = response.replace("'", "")
+                        await message.reply(response)
+
+                 if (message.reference is not None and  message.reference.resolved.author.id == client.user.id):
+                        response = get_similar_response(message.content , pairs, threshold=0.3)
+                        if response is not None:
+                            givenResponses.append([message.content,[response]])
+                            saveResponse(givenResponses)
+                
+                        else:
+                           print('Random')
+                           random.seed(time.time())
+                           response = random.choice(response_list)
+                           givenResponses.append([message.content,[response]])
+                           saveResponse(givenResponses)  
+                        await message.reply(response)
+
+
                  if msg1 != "None" and msg2 == "None":
                      msg2 = message.content
                      if message.attachments:
@@ -6707,7 +8492,7 @@ def main():
                  if i == 57:
                     await asyncio.sleep(60)
              
-                    amount = amount + i
+                    #amount = amount + i
                     i = 0
 
     with open('testt.json', 'w') as file:
@@ -6756,18 +8541,127 @@ def main():
             channel_id = 1030490392510079063
             channel = client.get_channel(channel_id)
             names = ", ".join(name_days[today])
-            await channel.send(f"Šodien({today}) vārda dienu svin :biting_lip: : {names}")
+            await channel.send(f"Šodien({today}) vārda dienu svin :piñata: : {names}")
         else:
             await channel.send(f"Šodien({today}) neviens nesvin vārda dienu.")
    ############# Varda dienas ################
 
+    ########### BIRTHDAY ################
+
+
+
+    # text
+  #  channel = client.get_channel(1030490392510079063)
+    #replied_message = await channel.fetch_message(1173507746931417120)
+    #replied_zina = replied_message.content
+    #current_zina = await channel.fetch_message(1173508447241765026)
+    #current_zina = message.content
+    #tones = ["sarcastic", "assertive", "sad", "cynical", "indignant", "contemplative", "witty", "persuasive", "rude", "angry", "romantic", "humorous", "adventurous", "creative", "friendly", "optimistic", "pessimistic", "nostalgic", "hopeful", "enthusiastic", "ambivalent", "descriptive", "suspenseful", "factual", "informative", "playful", "inspiring", "melancholic", "mysterious", "objective", "subjective", "sympathetic", "empathetic", "reflective", "confident", "satirical", "ironic", "sincere", "cautious", "credible", "informal", "formal", "professional", "scholarly", "inspirational", "controversial", "diplomatic", "nurturing", "authoritative", "didactic", "patronizing", "dismissive", "unemotional", "nihilistic"]
+
+    #random.seed(time.time())
+    #selected_tone = "enthusiastic "
+
+    #name = getUserName(replied_message.author.name)
+    #if name is not None:
+        #vards  = unidecode(name)
+    #    vards = message.author.name
+    # else:
+    #     vards = message.author.name
+    # if '.' in vards: # Check if nickname exists and contains dots
+    #         vards = vards.replace('.', '') 
+  #  await channel.trigger_typing()
+
+    #  gpt_key               = os.getenv("GPT")
+    client_chat = OpenAI(api_key=gpt_key)
+    
+  #  rresponsee = client_chat.chat.completions.create(
+  #  model='gpt-4-1106-preview',
+  #  messages = [
+  #  {"role": "system", "content": f" You are a wise all-knowing person named 'Elizabete' who was created 15.03.2023 by Jānis. You can do anything. Respond mainly in Latvian language but others as well if asked. Do not mention you are language model or program.  You answer to any kind of question and request. You can address specific users when requested. One of your tasks is to count game wins.\
+  #              Discord server is called 'Asās resnās mērcītes'. Yesterday server was renamed to 'Asās resnās desiņas'\
+  #              Pretend you can give compliments and advices\
+  #              Use grounded nostalgic tone.\
+  #              When asked about people give long response, Use grounded nostalgic tone tone.. \
+  #              Some server users are: Daisy, , Paula, Elvis, Oskars, Madara, notacop, Agris, Ivars, Kapars, swich, Jānis, , Megana, , Eliots, Bibops, Evol, anXIETY, gesmens, Kampys, Speķmaizīte.\
+  #              Pretend you are creative storyteller with vivid imagination whos every story is original. Use grounded nostalgic tone.\
+  #              Todays date is {getDate()}.\
+  #              Precīzs pulkstens šobrīd ir {getTime()}"},
+  #  {"role": "user", "content": f"Atfirst you were created to just count game victories but over the year you were developed and evolved. Tell us how you feel in your birthday. You present hot spicy sausage themed cake."}
+  #  ],
+  #  max_tokens=800,
+  #  n=1,
+  #  stop=None,
+  #  temperature=0.6,
+  #  )                              
+  #  responsee = rresponsee.choices[0].message.content
+  #  responsee = responsee.replace('"', '')
+  #  responsee = responsee.replace("'", "")
+  #  new_message1 = await channel.send(responsee) 
+
+    #voice
+  #  speak_text = responsee
+  #  gpt_key               = os.getenv("GPT")
+  #  client_speach = OpenAI(api_key=gpt_key)
+
+  #  output_directory = "C:\\Users\\ZK00138\\source\\repos\\ResnsCounter\\ResnsCounter\\text to speach"  # Set your desired output directory here
+  #  current_time = datetime.now().strftime("%Y%m%d%H%M%S")
+  #  file_name = f"speech_{current_time}.mp3"
+
+  #  speech_file_path = Path(output_directory) / file_name
+  #  ressponse = client_speach.audio.speech.create(
+  #      model= "tts-1-hd",
+  #      voice= "shimmer",
+  #      input= speak_text
+  #  )
+
+  #  ressponse.stream_to_file(speech_file_path)
+  #  with open(speech_file_path, 'rb') as f1:
+  #      file1 = discord.File(f1, filename='Elizabete_runa.mp3')
+  #  await channel.send(files=[file1]) 
+
+
+
+   # Dalle 3 picture
+  #  client_dalle = OpenAI(api_key=gpt_key)
+  #  respponse = client_dalle.images.generate(
+  #      model="dall-e-3",
+ #       prompt="hot spicy sausage themed 1 year birthday cake",
+  #      size="1024x1024",
+  #      quality="hd",
+ #       n=1,
+ #   )
+  #  image_url = respponse.data[0].url
+    # Download the image using requests module
+  #  responseee = requests.get(image_url)
+  #  image_content = responseee.content
+
+    # Generate filename with timestamp
+  #  filename = f"generated_image_{int(time.time())}.png"
+
+    # Create "generated" directory if it doesn't exist
+   # if not os.path.exists("generated"):
+  #      os.makedirs("generated")
+
+    # Save the image to "generated" directory
+  #  with open(f"generated/{filename}", "wb") as f:
+ #       f.write(image_content)
+
+    # Send the saved image as an embed in a Discord message
+    # Send the saved image as an embed in a Discord message
+   # file = discord.File(f"generated/{filename}")
+    #embed = discord.Embed()
+    #embed.set_image(url=f"attachment://{filename}")
+  #  new_message = await channel.send(file=file)
+
+
+    ########### BIRTHDAY ################
 
     # Izveido statusuw
-    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over your shoulder"))
+    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="year go by"))
 
 
     # Izveido grafiku, kad sūta ziņas pats
-    #asyncio.create_task(schedule_messages()) #@#
+   # asyncio.create_task(schedule_messages()) #@#
 
 
     channel = client.get_channel(SCREENSHOT_CHANNEL_ID)
@@ -7212,6 +9106,7 @@ def main():
     role5_id = 1087337344320929793 #santehniķi
     role6_id = 1030530963291254814 # basic user
     role7_id = 1086940826829078531 
+
     #role8_id = 1030530963291254814 # basic
     author_roles = member.roles
     return any(role.id in (role1_id, role2_id, role3_id, role4_id, role5_id, role6_id, role7_id) for role in author_roles)
@@ -7264,6 +9159,7 @@ def main():
        #     await sent_message.edit(embed=revealed_embed, files=[file1, file2, file3])
        #     await sent_message.clear_reactions()
 
+
         ################# SECURITY ######################
         if message.guild is None:
             # Handle DMs differently here
@@ -7282,6 +9178,9 @@ def main():
         #serious 
       #  tones = ["satirical", "witty", "amusing"]
 
+        if "atdarini" in message.content.lower():
+            first_two_words,   atdarini_description_response = process_string_for_atdarini_two(message.content.lower())
+            first_three_words, atdarini_description = process_string_for_atdarini(message.content.lower())            
 
         random.seed(time.time())
         selected_tone = random.choice(tones)
@@ -7317,6 +9216,13 @@ def main():
                 msgCount = 0
                 botMsg = True
                 return
+
+        if "onlyfan leaks here" in message.content.lower():
+            admin = client.get_user(391668973315424277)
+            await admin.send(f"SPAM DETECTED! Message from {message.author} in {message.channel.name}: {message.content}")
+
+            await message.delete()
+            return
 ########################### UPDATED ###################
 
 
@@ -7448,7 +9354,101 @@ def main():
             #if message.author.id == 909845424909729802:
             #    return
             key_word = ["pajautā jautājumu", "atdarini", "gudrais"]
-            if  any(word in message_modif for word in key_word) and mentioned_user:
+
+            if (message.reference and "atdarini 3d" in message.content.lower()):
+                if message_modif.startswith('atdarini 3d'):
+                    referance_msg = message.reference.message_id
+                    referance_msg_cont = await message.channel.fetch_message(referance_msg)
+                    if referance_msg_cont.attachments:
+                        gif_url = referance_msg_cont.attachments[0].url
+                        gif_response = requests.get(gif_url)
+                        with Image.open(BytesIO(gif_response.content)) as img:
+                            if img.format == 'GIF':
+                                # Convert the GIF image to PNG format
+                                img = img.convert('RGBA')
+                                bg = Image.new('RGBA', img.size, (255, 255, 255))
+                                bg.paste(img, img)
+                                img = bg.convert('RGB')
+                                img.save('file_to_3d.png', 'png')
+                                files  = await generate_3d("file_to_3d.png") 
+                                new_message =   await message.channel.send(files=files)
+                                return
+                            else:
+                                # Save the image as PNG directly
+                                img.save('file_to_3d.png', 'png')
+                                files  = await generate_3d("file_to_3d.png") 
+                                new_message =   await message.channel.send(files=files)
+                                return
+                        #print ('testtt')
+                    else:
+
+                        try:
+                            if "atdarini 3d" in message.content.lower():
+                                referance_msg = message.reference.message_id
+                                referance_msg_cont = await message.channel.fetch_message(referance_msg)
+                                gif_url = referance_msg_cont.content
+                                gif_url2 = get_direct_gif_link(gif_url)
+                                if gif_url2 is None:
+                                    gif_url2 = referance_msg_cont.content
+                                gif_response = requests.get(gif_url2)
+                                with Image.open(BytesIO(gif_response.content)) as img:
+                                    if img.format == 'GIF':
+                                        # Convert the GIF image to PNG format
+                                        img = img.convert('RGBA')
+                                        bg = Image.new('RGBA', img.size, (255, 255, 255))
+                                        bg.paste(img, img)
+                                        img = bg.convert('RGB')
+                                        img.save('file_to_3d.png', 'png')
+                                        files  = await generate_3d("file_to_3d.png") 
+                                        new_message =   await message.channel.send(files=files)
+                                        return
+                                    else:
+                                        # Save the image as PNG directly
+                                        img.save('file_to_3d.png', 'png')
+                                        files  = await generate_3d("file_to_3d.png") 
+                                        new_message =   await message.channel.send(files=files)
+                                        return
+                        except:
+                                keyword = message_modif.split()[0]
+                            # Get user input from message
+
+                                user_input = message.content.lower().split(keyword)[1]
+                                #input_en = translateMsg(user_input)
+                                input_en = user_input
+                                await message.channel.trigger_typing()
+
+                                response = client_dalle.images.generate(
+                                    model="dall-e-3",
+                                    prompt= "white background, 3d render" + input_en,
+                                    size="1024x1024",
+                                    quality="hd",
+                                    n=1,
+                                )
+                                image_url = response.data[0].url
+                                # Download the image using requests module
+                                response = requests.get(image_url)
+                                image_content = response.content
+
+                                # Generate filename with timestamp
+                                filename = f"generated_image_{int(time.time())}.png"
+
+                                # Create "generated" directory if it doesn't exist
+                                if not os.path.exists("generated"):
+                                    os.makedirs("generated")
+
+                                # Save the image to "generated" directory
+                                with open(f"generated/{filename}", "wb") as f:
+                                    f.write(image_content)
+
+                                # Send the saved image as an embed in a Discord message
+                                # Send the saved image as an embed in a Discord message
+                                file = discord.File(f"generated/{filename}")
+
+                                files  = await generate_3d(f"generated/{filename}")
+                                new_message =   await message.channel.send(files=files)
+                                return
+
+            elif  any(word in message_modif for word in key_word) and mentioned_user:
                 if message_modif.startswith('pajautā jautājumu'):
                     random.seed(time.time())
                     response = random.choice(question_list)
@@ -7459,7 +9459,122 @@ def main():
 ############################### NEW ################################
 
 # Atdarina lietotāja profila bildi
-                elif "atdarini " in message.content.lower():
+                elif "atdarini 3d" in message.content.lower():
+                    if len(message.mentions) > 0:
+                        
+                        avatar_url = message.mentions[0].display_avatar.url
+                        avatar_response = requests.get(avatar_url)
+                        # Check if the avatar image is a GIF
+                        await message.channel.trigger_typing()
+                        with Image.open(BytesIO(avatar_response.content)) as img:
+                            if img.format == 'GIF':
+                                # Convert the GIF image to PNG format
+                                img = img.convert('RGBA')
+                                bg = Image.new('RGBA', img.size, (255, 255, 255))
+                                bg.paste(img, img)
+                                img = bg.convert('RGB')
+                                img.save('avatar.png', 'png')
+                            else:
+                                # Save the image as PNG directly
+                                img.save('avatar.png', 'png')
+                        files  = await generate_3d("avatar.png") 
+                        new_message =   await message.channel.send(files=files)
+                        return
+
+                elif atdarini_description is not None and message.reference is None:
+                    if len(message.mentions) == 1:
+                        human = "man "
+                        if message.mentions[0].id == 122797491044220928 or message.mentions[0].id == 391668973315424277 or message.mentions[0].id == 317030319624814592:
+                            human = "girl "
+                        await message.channel.trigger_typing()
+                        description_en = translateMsg(atdarini_description)
+                        description_enchanted = await enchPrompt(human + " photo " + description_en)
+                        print(description_enchanted)
+                        avatar_url = message.mentions[0].display_avatar.url
+                        avatar_response = requests.get(avatar_url)
+                        user_id = message.mentions[0].id
+                        # Check if the avatar image is a GIF
+                        await message.channel.trigger_typing()
+                        #if user_id == 122797491044220928:
+                         #   avatar_name = "IPAdapter_00473_.png"
+
+
+                        avatar_name = f"avatar_{user_id}.png"
+                        with Image.open(BytesIO(avatar_response.content)) as img:
+                            if img.format == 'GIF':
+                                # Convert the GIF image to PNG format
+                                img = img.convert('RGBA')
+                                bg = Image.new('RGBA', img.size, (255, 255, 255))
+                                bg.paste(img, img)
+                                img = bg.convert('RGB')
+                                img.save(f"avatars/{avatar_name}", 'png')
+                            else:
+                                # Save the image as PNG directly
+                                img.save(f"avatars/{avatar_name}", 'png')
+                        try:
+                            model = "realisticVisionV60B1_v51VAE.safetensors"
+                            files  = await generate_face_id(avatar_name,description_enchanted, model)  
+                            new_message =   await message.channel.send(files=files)
+                            return
+                        except:
+                            new_message =   await message.channel.send("Tagad nevaru. Daisy COD time.")
+                            return
+                    elif len(message.mentions) == 2:
+                        humans = "two men "
+                        if message.mentions[0].id == 391668973315424277 and message.mentions[1].id == 317030319624814592:  
+                             humans = "two girls "
+                        elif message.mentions[1].id == 391668973315424277 and message.mentions[0].id == 317030319624814592:
+                            humans = "two girls "
+
+                        elif message.mentions[0].id == 122797491044220928 and message.mentions[1].id == 317030319624814592:
+                            humans = "two girls "
+                        elif message.mentions[1].id == 122797491044220928 and message.mentions[0].id == 317030319624814592:
+                            humans = "two girls "
+
+                        elif message.mentions[0].id == 122797491044220928 and message.mentions[1].id == 391668973315424277:
+                            humans = "two girls "
+                        elif message.mentions[1].id == 122797491044220928 and message.mentions[0].id == 391668973315424277:
+                            humans = "two girls "
+
+                        elif message.mentions[0].id == 122797491044220928 or message.mentions[0].id == 391668973315424277 or message.mentions[0].id == 317030319624814592:
+                           humans = "girl and man "
+                        await message.channel.trigger_typing()
+                        description_en = translateMsg(atdarini_description)
+                        description_enchanted = await enchPrompt(humans + " photo " + description_en)
+                        print(description_enchanted)
+                        avatar_list = []
+                        i = 0
+                        for mention in message.mentions:
+                            user_id = mention.id
+
+                            avatar_url = mention.display_avatar.url
+                            avatar_response = requests.get(avatar_url)
+                            # Check if the avatar image is a GIF
+                            await message.channel.trigger_typing()
+                            avatar_name = f"avatar_{int(time.time())}_{i}.png"
+                            avatar_list.append(avatar_name)
+                            i = i + 1
+                            with Image.open(BytesIO(avatar_response.content)) as img:
+                                if img.format == 'GIF':
+                                    # Convert the GIF image to PNG format
+                                    img = img.convert('RGBA')
+                                    bg = Image.new('RGBA', img.size, (255, 255, 255))
+                                    bg.paste(img, img)
+                                    img = bg.convert('RGB')
+                                    img.save(f"avatars/{avatar_name}", 'png')
+                                else:
+                                    # Save the image as PNG directly
+                                    img.save(f"avatars/{avatar_name}", 'png')
+                        try:
+                            files  = await generate_face_id_two_people(avatar_list[0], avatar_list[1],description_enchanted)  
+                            new_message =   await message.channel.send(files=files)
+                            return
+                        except:
+                            new_message =   await message.channel.send("Tagad nevaru. Daisy COD time.")
+                            return
+                    elif len(message.mentions) > 2:
+                        await message.channel.send("Pagaidām varu tik vienu vai divus cilvēkus")
+                elif "atdarini " in message.content.lower() and len(message.mentions) > 0 and message.reference is None:
                     if len(message.mentions) > 0:
                         
                         avatar_url = message.mentions[0].display_avatar.url
@@ -7490,6 +9605,8 @@ def main():
                         embed.set_image(url=image_url)
                         await message.channel.send(embed=embed)
                         return
+
+
 ################################################### NEW ##################################### 4 20
                 elif message_modif.startswith('gudrais'):
                     
@@ -7555,11 +9672,248 @@ def main():
                     message_to_send = f"{mentioned_users_str}, {generated_text}"
                     await message.channel.send(message_to_send)
                     return
-                else:
-                    test = 0
+               # else:
+               #     test = 0
 ################################################### NEW ##################################### 4 20    ## could add unicode after else as well 
  ############################### NEW ################################  
+                elif "atdarini 3d" in message.content.lower():
+                    try:
+                        keyword = message_modif.split()[0]
+                    # Get user input from message
 
+                        user_input = message.content.lower().split(keyword)[1]
+                        #input_en = translateMsg(user_input)
+                        input_en = user_input
+                        await message.channel.trigger_typing()
+
+                        response = client_dalle.images.generate(
+                            model="dall-e-3",
+                            prompt= "white background, 3d render" + input_en,
+                            size="1024x1024",
+                            quality="hd",
+                            n=1,
+                        )
+                        image_url = response.data[0].url
+                        # Download the image using requests module
+                        response = requests.get(image_url)
+                        image_content = response.content
+
+                        # Generate filename with timestamp
+                        filename = f"generated_image_{int(time.time())}.png"
+
+                        # Create "generated" directory if it doesn't exist
+                        if not os.path.exists("generated"):
+                            os.makedirs("generated")
+
+                        # Save the image to "generated" directory
+                        with open(f"generated/{filename}", "wb") as f:
+                            f.write(image_content)
+
+                        # Send the saved image as an embed in a Discord message
+                        # Send the saved image as an embed in a Discord message
+                        file = discord.File(f"generated/{filename}")
+
+                        files  = await generate_3d(f"generated/{filename}")
+                        new_message =   await message.channel.send(files=files)
+                        return
+                    except:
+                        keyword = message_modif.split()[0]
+                    # Get user input from message
+
+                        user_input = message.content.lower().split(keyword)[1]
+                        #input_en = translateMsg(user_input)
+                        input_en = "white background, 3d render" + user_input
+                        # model = "juggernautXL_version6Rundiffusion.safetensors"
+                        model = "turbovisionxlSuperFastXLBasedOnNew_tvxlV431Bakedvae.safetensors"
+                        model = "dreamshaperXL_v21TurboDPMSDE.safetensors"
+                        #await chose_model.delete()
+                        #await chose_model.delete()
+                        #msgg = "*Echoing image in speed mode... wait time: **up to 6sec*** \nInfo: https://discord.com/channels/1030490392057085952/1132935102813454396"
+                       # wait_msg = await message.channel.send(msgg)
+                        # wait_gif = await message.channel.send("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExazBhbGl6eDRvZmRjZTYydDRibWk2cGlodG01dWo1ZHp0bG56eWR6YiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/BafwY2lTD28xjy1GFP/giphy.gif") 
+                        #wait_gif = await message.channel.send("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcmMzb2J4b2M5ajEwd2Z4azByc3RqZWE2NTlxNnN0a2xmbDdtNnF2aCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/QKhRz2iaGw4v5rNIx7/giphy.gif")
+                       # wait_gif = await message.channel.send("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExd2Vzc3BsbXBmdHk0NW1odzd4NnBvdm4wOG10NjZnZzV0bHA4NHN0NyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/0oHZSBUjawh3OLRbO9/giphy.gif")
+                        message.channel.trigger_typing                          
+                        lora = False
+                        files = []
+                        three = False
+                        vae = False
+                        V4 = False
+                        support = input_en
+                        neg_prompt = ""
+                        w = 1024
+                        h = 1024
+                        #neg_prompt = ""
+                            
+                        files, image_name, seed = await generate_image_turbo(V4, input_en, neg_prompt, w , h, keyword, model, three,vae, lora, support) 
+
+                        filess  = await generate_3d(f"generatedNewAge/{image_name}")
+                        new_message =   await message.channel.send(files=filess)
+                        return
+                elif (message.reference and "atdarini" in message.content.lower()) :
+                    if len(message.mentions) > 0 :
+                        referance_msg = message.reference.message_id
+                        referance_msg_cont = await message.channel.fetch_message(referance_msg)
+                        if referance_msg_cont.attachments:
+                            await message.channel.trigger_typing()
+                            gif_url = referance_msg_cont.attachments[0].url
+                            gif_response = requests.get(gif_url)
+                            description_en = translateMsg(atdarini_description_response)
+                            description_enchanted = await enchPrompt("two men " + description_en)
+                            attachment_name = f"attachment_{int(time.time())}.png"
+                            with Image.open(BytesIO(gif_response.content)) as img:
+                                if img.format == 'GIF':
+                                    # Convert the GIF image to PNG format
+                                    img = img.convert('RGBA')
+                                    bg = Image.new('RGBA', img.size, (255, 255, 255))
+                                    bg.paste(img, img)
+                                    img = bg.convert('RGB')
+                                    img.save(f"avatars/{attachment_name}", 'png')
+                                   # await message.channel.trigger_typing()
+                                    #files  = await generate_face_id(avatar_name,description_enchanted)
+                                   # new_message =   await message.channel.send(files=files)
+                                   # return
+                                else:
+                                    # Save the image as PNG directly
+                                    img.save(f"avatars/{attachment_name}", 'png')
+                                   # await message.channel.trigger_typing()
+                                   # files  = await generate_face_id(avatar_name,description_enchanted)
+                                   # new_message =   await message.channel.send(files=files)
+                                   # return
+                        else:
+                                gif_url = referance_msg_cont.content
+                                gif_url2 = get_direct_gif_link(gif_url)
+                                if gif_url2 is None:
+                                    gif_url2 = referance_msg_cont.content
+                                gif_response = requests.get(gif_url2)
+                                description_en = translateMsg(atdarini_description_response)
+                                await message.channel.trigger_typing()
+                                description_enchanted = await enchPrompt("two men " + description_en)
+                                attachment_name = f"gif_{int(time.time())}.png"
+                                with Image.open(BytesIO(gif_response.content)) as img:
+                                    if img.format == 'GIF':
+                                        # Convert the GIF image to PNG format
+                                        img = img.convert('RGBA')
+                                        bg = Image.new('RGBA', img.size, (255, 255, 255))
+                                        bg.paste(img, img)
+                                        img = bg.convert('RGB')
+                                        img.save(f"avatars/{attachment_name}", 'png')
+                                       ## await message.channel.trigger_typing()
+                                       # files  = await generate_face_id(avatar_name,description_enchanted)
+                                       # new_message =   await message.channel.send(files=files)
+                                       # return
+                                    else:
+                                        # Save the image as PNG directly
+                                        img.save(f"avatars/{attachment_name}", 'png')
+                                        #await message.channel.trigger_typing()
+                                       # files  = await generate_face_id(avatar_name,description_enchanted)
+                                        #new_message =   await message.channel.send(files=files)
+                                       # returN
+                        if len(message.mentions) == 1:
+                            avatar_url = message.mentions[0].display_avatar.url
+                            avatar_response = requests.get(avatar_url)
+                            user_id = message.mentions[0].id
+                        else:
+                            avatar_url = message.mentions[1].display_avatar.url
+                            avatar_response = requests.get(avatar_url)
+                            user_id = message.mentions[1].id
+                        # Check if the avatar image is a GIF
+                        await message.channel.trigger_typing()
+                        #if user_id == 122797491044220928:
+                            #   avatar_name = "IPAdapter_00473_.png"
+
+
+                        avatar_name = f"avatar_{user_id}.png"
+                        with Image.open(BytesIO(avatar_response.content)) as img:
+                            if img.format == 'GIF':
+                                # Convert the GIF image to PNG format
+                                img = img.convert('RGBA')
+                                bg = Image.new('RGBA', img.size, (255, 255, 255))
+                                bg.paste(img, img)
+                                img = bg.convert('RGB')
+                                img.save(f"avatars/{avatar_name}", 'png')
+                            else:
+                                # Save the image as PNG directly
+                                img.save(f"avatars/{avatar_name}", 'png')                    
+                        await message.channel.trigger_typing()
+                        try:
+                            files  = await  generate_face_id_two_people(attachment_name, avatar_name,description_enchanted)
+                            new_message =   await message.channel.send(files=files)
+                            return
+                        except:
+                            new_message =   await message.channel.send("Tagad nevaru. Daisy COD time.")
+                            return
+
+
+                        
+
+
+
+                    else:
+                        referance_msg = message.reference.message_id
+                        referance_msg_cont = await message.channel.fetch_message(referance_msg)
+                        if referance_msg_cont.attachments:
+                            await message.channel.trigger_typing()
+                            gif_url = referance_msg_cont.attachments[0].url
+                            gif_response = requests.get(gif_url)
+                            description_en = translateMsg(atdarini_description_response)
+                            description_enchanted = await enchPrompt("man" + description_en)
+                            avatar_name = f"attachment_{int(time.time())}.png"
+                            with Image.open(BytesIO(gif_response.content)) as img:
+                                if img.format == 'GIF':
+                                    # Convert the GIF image to PNG format
+                                    img = img.convert('RGBA')
+                                    bg = Image.new('RGBA', img.size, (255, 255, 255))
+                                    bg.paste(img, img)
+                                    img = bg.convert('RGB')
+                                    img.save(f"avatars/{avatar_name}", 'png')
+                                    await message.channel.trigger_typing()
+                                    model = "realisticVisionV60B1_v51VAE.safetensors"
+                                    files  = await generate_face_id(avatar_name,description_enchanted, model)  
+
+                                    new_message =   await message.channel.send(files=files)
+                                    return
+                                else:
+                                    # Save the image as PNG directly
+                                    img.save(f"avatars/{avatar_name}", 'png')
+                                    await message.channel.trigger_typing()
+                                    model = "realisticVisionV60B1_v51VAE.safetensors"
+                                    files  = await generate_face_id(avatar_name,description_enchanted, model)  
+
+                                    new_message =   await message.channel.send(files=files)
+                                    return
+                        else:
+                                gif_url = referance_msg_cont.content
+                                gif_url2 = get_direct_gif_link(gif_url)
+                                if gif_url2 is None:
+                                    gif_url2 = referance_msg_cont.content
+                                gif_response = requests.get(gif_url2)
+                                description_en = translateMsg(atdarini_description_response)
+                                await message.channel.trigger_typing()
+                                description_enchanted = await enchPrompt("man" + description_en)
+                                avatar_name = f"gif_{int(time.time())}.png"
+                                with Image.open(BytesIO(gif_response.content)) as img:
+                                    if img.format == 'GIF':
+                                        # Convert the GIF image to PNG format
+                                        img = img.convert('RGBA')
+                                        bg = Image.new('RGBA', img.size, (255, 255, 255))
+                                        bg.paste(img, img)
+                                        img = bg.convert('RGB')
+                                        img.save(f"avatars/{avatar_name}", 'png')
+                                        await message.channel.trigger_typing()
+                                        model = "realisticVisionV60B1_v51VAE.safetensors"
+                                        files  = await generate_face_id(avatar_name,description_enchanted, model)  
+
+                                        new_message =   await message.channel.send(files=files)
+                                        return
+                                    else:
+                                        # Save the image as PNG directly
+                                        img.save(f"avatars/{avatar_name}", 'png')
+                                        await message.channel.trigger_typing()
+                                        model = "realisticVisionV60B1_v51VAE.safetensors"
+                                        files  = await generate_face_id(avatar_name,description_enchanted, model)  
+                                        new_message =   await message.channel.send(files=files)
+                                        return
  # GPT sniedz garāku atbildi uz kādu jautājumu
             elif "gudrais" in message.content.lower():
                user_input = message.content.lower().split("gudrais ")[1]
@@ -7664,7 +10018,10 @@ def main():
                         await message.channel.send('Tavs pieprasījums bija pārāk horny vai aizskarošs, priekšnieki neļauj man izpausties.')
                         return
 
-            
+           # elif "3d" in message.content.lower():
+           #     files  = await generate_3d() 
+             #   new_message =   await message.channel.send(files=files)
+             #   return
 ################################################ TEST ############################ 768
 
 
@@ -8224,7 +10581,7 @@ def main():
                             if not_enchanting:
                                # trying = False
                                # testing = False
-                                try:
+                               # try:
                                     # model = "juggernautXL_version6Rundiffusion.safetensors"
                                     #model = "brightprotonukeBPNNo_bpn13.safetensors"
                                     model = "zavychromaxl_v30.safetensors"
@@ -8232,6 +10589,8 @@ def main():
                                     model = "pixelwave_07.safetensors"
                                     model = "leosamsHelloworldXL_helloworldXL50GPT4V.safetensors"
                                     model = "juggernautXL_v9Rundiffusionphoto2.safetensors"
+                                    model = "playground-v2.5-1024px-aesthetic.fp16.safetensors"
+                                    model = "cascade"
                                     #model = "realvisxlV30_v30Bakedvae.safetensors"
                                     await chose_model.delete()
                                     #await chose_model.delete()
@@ -8252,6 +10611,8 @@ def main():
                                     seed = 0
                                     #files, image_name = await generate_image(V4, input_en, neg_prompt, w , h, keyword, model, three,vae, lora, support) 
                                     files, image_name = await generate_image_cascade(V4, input_en, neg_prompt, w , h, keyword, three,vae, lora, support) 
+                                    #steps = 50
+                                    #files, image_name, seed = await generate_image_lightning(V4, input_en, neg_prompt, w , h, keyword, model, three, vae, lora, support, steps) 
                                     #files, image_name = await generate_image_playground(V4, input_en, neg_prompt, w , h, keyword, three,vae, lora, support) 
 
                                     await wait_msg.delete()
@@ -8286,22 +10647,23 @@ def main():
                                     with open("prompts.json", "w") as file:
                                         json.dump(prompts, file, indent=4)  # You can adjust the indent for pretty printing
                                         file.write('\n')
-                                except:
-                                    print('Stable diffusion offline. Using Dalle-3')
-                                    await wait_msg.delete()
-                                    await wait_gif.delete()
-                                    backup = True
-                                    msgg = "*Generator offline, echoing image using Dalle-3 instead... wait time: **up to 20sec*** \nInfo: https://discord.com/channels/1030490392057085952/1132935102813454396"
-                                    await self.echo_Dalle(msgg, backup)
+                              #  except:
+                              #      print('Stable diffusion offline. Using Dalle-3')
+                               #     await wait_msg.delete()
+                               #     await wait_gif.delete()
+                               #     backup = True
+                               #     msgg = "*Generator offline, echoing image using Dalle-3 instead... wait time: **up to 20sec*** \nInfo: https://discord.com/channels/1030490392057085952/1132935102813454396"
+                               #     await self.echo_Dalle(msgg, backup)
                             else:
                                 await message.channel.send("*Prompt is being enchanted, please try again after it is done.*")
                         @discord.ui.button(label="Speed", custom_id="speed_begin_button", row = 1,  style=discord.ButtonStyle.secondary) # Create a button with the label "😎 Click me!" with color Blurple
                         async def speed_begin_button__callback(self, button, interaction):
                           if not_enchanting:
-                            try:
+                            #try:
                                 # model = "juggernautXL_version6Rundiffusion.safetensors"
                                 model = "turbovisionxlSuperFastXLBasedOnNew_tvxlV431Bakedvae.safetensors"
-                                model = "dreamshaperXL_v2TurboDpmppSDE.safetensors"
+                                model = "dreamshaperXL_v21TurboDPMSDE.safetensors"
+                                model = "aetherverseLightning_v10.safetensors"
                                 await chose_model.delete()
                                 #await chose_model.delete()
                                 msgg = "*Echoing image in speed mode... wait time: **up to 6sec*** \nInfo: https://discord.com/channels/1030490392057085952/1132935102813454396"
@@ -8316,8 +10678,8 @@ def main():
                                 vae = False
                                 support = input_en
                                 #neg_prompt = ""
-                            
-                                files, image_name, seed = await generate_image_turbo(V4, input_en, neg_prompt, w , h, keyword, model, three,vae, lora, support) 
+                                steps = 8
+                                files, image_name, seed = await generate_image_lightning(V4, input_en, neg_prompt, w , h, keyword, model, three,vae, lora, support, steps) 
 
 
                                 await wait_msg.delete()
@@ -8352,13 +10714,13 @@ def main():
                                 with open("prompts.json", "w") as file:
                                     json.dump(prompts, file, indent=4)  # You can adjust the indent for pretty printing
                                     file.write('\n')
-                            except:
-                                print('Stable diffusion offline. Using Dalle-3')
-                                await wait_msg.delete()
-                                await wait_gif.delete()
-                                backup = True
-                                msgg = "*Generator offline, echoing image using Dalle-3 instead... wait time: **up to 20sec*** \nInfo: https://discord.com/channels/1030490392057085952/1132935102813454396"
-                                await self.echo_Dalle(msgg, backup)
+                           # except:
+                            #    print('Stable diffusion offline. Using Dalle-3')
+                            #    await wait_msg.delete()
+                            #    await wait_gif.delete()
+                            #    backup = True
+                            #    msgg = "*Generator offline, echoing image using Dalle-3 instead... wait time: **up to 20sec*** \nInfo: https://discord.com/channels/1030490392057085952/1132935102813454396"
+                            #    await self.echo_Dalle(msgg, backup)
                           else:
                                 await message.channel.send("*Prompt is being enchanted, please try again after it is done.*")
 
@@ -9002,7 +11364,7 @@ def main():
         #            await message.channel.send(file=file)
        #             return
 
-            elif "parādi" in message.content.lower():
+            elif "parādi" in message.content.lower() or "paradi" in message.content.lower():
                if "desu" in message.content.lower():
 
                   desa =    getGif("Sausage")
@@ -9170,8 +11532,9 @@ def main():
             elif re.match(r".*\bkā(\s+\S+)?\s+iet\s*\?", message_modif.lower()) or re.match(r".*\bka(\s+\S+)?\s+iet\s*\?", message_modif.lower()): #@#
                 response = random.choice(triger_KaIet["Ka iet"]) #@# 
           #  elif '?' in message_modif or message.channel.id == 1101461174907830312 or message.author.id == 909845424909729802 or mentioned_user: # 1101461174907830312 - ģenerē-general channel id
-            elif '?' in message_modif or "pasaki" in message_modif or "iesaki" in message_modif or "pastāsti" in message_modif or "pastasti" in message_modif or  "atvainojies" in message_modif or  "apsveic" in message_modif or message.channel.id == 1101461174907830312: # 1101461174907830312 - ģenerē-general channel id   ### hasijs or message.author.id == 242298879784124416
+            elif '?' in message_modif or "pasaki" in message_modif or "iesaki" in message_modif or "pastāsti" in message_modif or "pastasti" in message_modif or  "atvainojies" in message_modif or  "apsveic" in message_modif or message.channel.id == 1101461174907830312 or message.channel.id == 1030490392510079063 or mentioned_user: # 1101461174907830312 - ģenerē-general channel id   ### hasijs or message.author.id == 242298879784124416
                 current_zina = message_modif
+                #selected_tone = "grounded nostalgic tone"
                 #use_GPT = False
                 await message.channel.trigger_typing()
                 name = getUserName(message.author.name)
@@ -9191,7 +11554,7 @@ def main():
                 responsee = client_chat.chat.completions.create(
                 model='gpt-4-0125-preview',
                 messages = [
-                {"role": "system", "content": f'Your name is "Elizabete". You were created 15.03.2023. Reply with compact random response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Do not mention which tone using. Sometimes use emojis'},
+                {"role": "system", "content": f'Your name is "Elizabete". People also call you "mamma". You were created 15.03.2023. Reply with compact random response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Do not mention which tone using. Sometimes use emojis'},
                 {"role": "user", "name" : vards, "content": f"users wrote '{current_zina}' give random short or medium answer in context in latvian"}
                 ],
                 max_tokens=700,
@@ -9248,7 +11611,38 @@ def main():
             #Atbild, ja ir veiks replay vai mention
            if (client.user.mentioned_in(message) or message.reference is not None and  message.reference.resolved.author.id == client.user.id):
 
-            if message.reference is not None and message.reference.resolved.author.id == client.user.id and ('?' in message.content or "pasaki" in message.content or "iesaki" in message.content or "pastāsti" in message.content or "pastasti" in message.content): #  or message.author.id == 242298879784124416
+            if "parādi" in message.content.lower():
+               if "desu" in message.content.lower():
+
+                  desa =    getGif("Sausage")
+                  response = desa
+               elif "dibenu" in message.content.lower():
+                   dibens =    getGif("ass")
+                   response = dibens
+               elif "kājas" in message.content.lower():
+                   kajas =    getGif("girl legs")
+                   response = kajas
+               elif "pupus" in message.content.lower() or "krūtis" in message.content.lower() or "krutis" in message.content.lower():
+                   pupi =    getGif("Boobs")
+                   response = pupi
+               else:
+                   words = message.content.lower().split()
+                   paradi_index = words.index("parādi")
+                   pieprasijums = " ".join(words[paradi_index+1:])
+                   pieprasijums_en = translateMsg(pieprasijums)
+                  # pieprasijums_en = pieprasijums
+                   if pieprasijums == pieprasijums_en: #@#
+                       pieprasijums_en = "I failed you" #@#
+                   try:
+                       izteles_auglis =    getGif(pieprasijums_en)
+                   except ValueError:
+                       izteles_auglis =    getGif("I failed you")
+                   response = izteles_auglis
+                   await message.channel.send(response)
+                   return
+
+
+            elif message.reference is not None and message.reference.resolved.author.id == client.user.id and ('?' in message.content or "pasaki" in message.content or "iesaki" in message.content or "pastāsti" in message.content or "pastasti" in message.content): #  or message.author.id == 242298879784124416
            # if message.reference is not None and message.reference.resolved.author.id == client.user.id:                
                 replied_message = await message.channel.fetch_message(message.reference.message_id)
                 replied_zina = replied_message.content
@@ -9276,7 +11670,7 @@ def main():
                 responsee = client_chat.chat.completions.create(
                 model='gpt-4-0125-preview',
                 messages = [
-                {"role": "system", "content": f"Your name is Elizabete. You were created 15.03.2023. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact random response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji"},
+                {"role": "system", "content": f"Your name is Elizabete. People also call you 'mamma'. You were created 15.03.2023. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact random response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji"},
                 {"role": "user", "content": f"you wrote this answer '{replied_zina}'  and users wrote in response '{current_zina}' give random short or medium  answer in context in latvian"}
                 ],
                 max_tokens=700,
@@ -9300,7 +11694,7 @@ def main():
                 elif re.match(r".*\bkā(\s+\S+)?\s+iet\s*\?", message.content.lower()) or re.match(r".*\bka(\s+\S+)?\s+iet\s*\?", message.content.lower()): #@#
                     response = random.choice(triger_KaIet["Ka iet"]) #@
                # elif '?' in message.content or message.channel.id == 1101461174907830312: # 1101461174907830312 - ģenerē-general channel id
-                elif 'jtydjk' in message.content: # 1101461174907830312 - ģenerē-general channel id
+                elif message.channel.id == 1101461174907830312: # 1101461174907830312 - ģenerē-general channel id
                     current_zina = message_modif
                     name = getUserName(message.author.name)
                    # replied_messagee = await message.channel.fetch_message(message.reference.message_id)
