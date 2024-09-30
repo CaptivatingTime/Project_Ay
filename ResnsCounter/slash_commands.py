@@ -168,37 +168,6 @@ async def continuePlaying(err):
     if err:
         print(f"Error occurred while playing: {str(err)}")
     else:
-        async def play_recommended_song(err):
-            global was_stopped
-            if was_stopped:  # Check if playback was stopped intentionally
-                was_stopped = False  # Reset the flag for future playback
-                return  # Exit if playback was stopped     
-            if err:
-                print(f"Error occurred while playing: {str(err)}")
-            else:
-                try:
-                    print("Scheduling the next recommended song...")
-                    nextType = 'recommended'
-                    await continuePlaying(nextType)
-                except Exception as e:
-                    print(f"Error occurred while scheduling the next song: {str(e)}")
-        async def play_next_song(err):
-                global was_stopped
-                if was_stopped:  # Check if playback was stopped intentionally
-                    was_stopped = False  # Reset the flag for future playback
-                    return  # Exit if playback was stopped     
-                if err:
-                    print(f"Error occurred while playing: {str(err)}")
-                else:
-                    not_playlist = False
-                    #next_video_url = await getNextPlaylistSong(YTplaylist_url)
-                    next_video_url = ""
-                    nextType = 'playlist'
-                    try:
-                        print("Scheduling the next playlist song...")               
-                        await continuePlaying(nextType)
-                    except Exception as e:
-                        print(f"Error occurred while scheduling the next song: {str(e)}") 
         FFMPEG_OPTIONS = {
             'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
             'options': '-vn -filter:a "volume=0.25"'
@@ -235,7 +204,7 @@ async def continuePlaying(err):
             voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(continuePlaying(e), elizabeteClient.loop))       
                 
 
-        elif nextType == 'recommended':
+        elif nextType == 'recommended': # Work in pogress !!!
             YTvideo_url = get_next_related_video(artist_name)
             embed = discord.Embed(
                 title="📀*Now playing next similar song:*",  # Set the title
