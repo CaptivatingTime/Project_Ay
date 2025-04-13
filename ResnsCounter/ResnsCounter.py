@@ -54,7 +54,9 @@ from functions import (getTime,
                        scan_unsaved_msg,
                        notify_nameday,
                        notify_weather,
-                       timeOfDay
+                       timeOfDay,
+                       waiting_christmas,
+                       newyear
                       )
 
 from slash_commands import (resnums_slash,
@@ -71,7 +73,7 @@ from chat_functions import (post_random_image,
 from functions_onMessage import gudrais_response
 from functions_atdarini import atdarini_person
 from Classes import Config, MsgCollector
-
+#from activityTracker import trackActivity
 # suppress the warning
 warnings.filterwarnings("ignore", message="The parameter 'token_pattern' will not be used since 'tokenizer' is not None'")
 
@@ -80,7 +82,7 @@ warnings.filterwarnings("ignore", message="The parameter 'token_pattern' will no
 
 ############# gudrais ######################
 # Function to load data from JSON file
-
+firstBoot = True
 def load_data_from_json(file_name):
     try:
         with open(file_name, 'r') as file:
@@ -320,7 +322,6 @@ def main():
        phrases_awayReason = json.load(f)  
 
 
-   givenResponses = []
 
    load_dotenv()
    intents = discord.Intents.default()
@@ -350,8 +351,30 @@ def main():
    async def stop_slash(interaction: discord.Interaction):
        await stop_music(interaction, client) 
 
-    ## Slash commaands
-   
+   @client.tree.command(name="muteall", description="mute all people")
+   async def mute_all_except_roles(interaction: discord.Interaction):
+    allowed_role_id = 1030491560397246494  # ID of the role that can use this command
+    role1_id = 1030491560397246494  # First exempt role ID
+    role2_id = 1295909785094586448  # Second exempt role ID
+
+    # Check if the user has the allowed role to use this command
+    if discord.utils.get(interaction.user.roles, id=allowed_role_id):
+        if interaction.user.voice and interaction.user.voice.channel:
+            voice_channel = interaction.user.voice.channel
+
+            for member in voice_channel.members:
+                has_role1 = discord.utils.get(member.roles, id=role1_id)
+                has_role2 = discord.utils.get(member.roles, id=role2_id)
+
+                # Mute the member if they do not have both exempt roles
+                if not (has_role1 and has_role2):
+                    await member.edit(mute=True)
+
+            await interaction.response.send_message("Muted all members without the specific roles.", ephemeral=True)
+        else:
+            await interaction.response.send_message("You're not in a voice channel.", ephemeral=True)
+    else:
+        await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
 
    #Chatbot initialization
    pairs, response_list, lv_reflections = Chatbot()
@@ -398,7 +421,7 @@ def main():
             post_time = now + timedelta(hours=1)
             # Print the scheduled message post time
             print(f"\nNext Resnas mammas response message will be posted at: {post_time.strftime('%H:%M:%S')}\n") 
-            await asyncio.sleep(3600)
+            await asyncio.sleep(14400)
             if Myconfig.getElizabeteLastMsg() == False: 
                 await post_reply_message(channel, client, pairs, response_list)
 
@@ -407,7 +430,7 @@ def main():
             # Print the scheduled message post time
             print(f"\nNext Resnas mammas random mention message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
             print("last message sent by Elizabete: " + str(Myconfig.getElizabeteLastMsg()))
-            await asyncio.sleep(7200)  # Sleep for 3 hour
+            await asyncio.sleep(14400)  # Sleep for 3 hour
             print("last message sent by Elizabete: " + str(Myconfig.getElizabeteLastMsg()))
             if Myconfig.getElizabeteLastMsg() == False:
                 await post_mention_message(channel, client, pairs, response_list, question_list)
@@ -418,7 +441,7 @@ def main():
             post_time = now + timedelta(hours=2)
             # Print the scheduled message post time
             print(f"\nNext Resnas mammas random message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
-            await asyncio.sleep(7200)
+            await asyncio.sleep(14400)
             if Myconfig.getElizabeteLastMsg() == False:
                 await post_random_message(channel, client, pairs, response_list) 
 
@@ -426,17 +449,17 @@ def main():
             post_time = now + timedelta(hours=1 )
             # Print the scheduled message post time
             print(f"\nNext Resnas mammas random image message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
-            await asyncio.sleep(3600)  # Sleep for 3 hour
+            await asyncio.sleep(14400)  # Sleep for 3 hour
             if Myconfig.getElizabeteLastMsg() == False:
                 await post_random_image(channel, client, pairs, response_list)
 
-          #  now = datetime.now() + timedelta(hours=1 )
-         #   post_time = now + timedelta(hours=2)
+            now = datetime.now() + timedelta(hours=1 )
+            post_time = now + timedelta(hours=2)
             # Print the scheduled message post time
-          #  print(f"\nNext Resnas mammas comment message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
-         #   await asyncio.sleep(7200)  # Sleep for 1 hour
-         #   if Myconfig.getElizabeteLastMsg() == False:
-          #      await post_comment_message(channel, client, pairs, response_list, Myconfig.getThreadID())
+            print(f"\nNext Resnas mammas comment message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
+            await asyncio.sleep(14400)  # Sleep for 1 hour
+            if Myconfig.getElizabeteLastMsg() == False:
+                await post_comment_message(channel, client, pairs, response_list, Myconfig.getThreadID())
 
 ###################### INTERACT IN CHAT OVER TIME ########################^
 
@@ -867,6 +890,7 @@ def main():
         with open("prompts.json", "w") as file:
             json.dump(prompts, file, indent=4)  # You can adjust the indent for pretty printing
             file.write('\n')
+   
    post = True
    class MainButtons(discord.ui.View): # Create a class called MyView that subclasses discord.ui.View
         def __init__(self):
@@ -888,7 +912,7 @@ def main():
         def __init__(self):
             super().__init__(timeout=None) # timeout of the view must be set to None
 
-        async def common_button_function(self,  w, h, three, search_key, msgg1, redo, model):
+        async def common_button_function(self, three, search_key, msgg1, redo, model, aspect_ratio):
             channel = client.get_channel(1101461174907830312)
 
             await Myconfig.getEchoButtons().delete()
@@ -909,11 +933,12 @@ def main():
             #support           = prompts.get(str(search_key), {}).get("support_prompt", "")             
             recent_action     = prompts.get(str(search_key), {}).get("latest_action", "")
             og_message     = prompts.get(str(search_key), {}).get("og_message", "")
+            #aspect_ratio = prompts.get(str(search_key), {}).get("aspect_ratio", "")
             #mode     = prompts.get(str(search_key), {}).get("mode", "")
-            neg_prompt        = prompts.get(str(search_key), {}).get("negative", "")
-            clip1 = prompts.get(str(search_key), {}).get("clip1", "")
-            clip2 = prompts.get(str(search_key), {}).get("clip2", "")
-            t5 = prompts.get(str(search_key), {}).get("t5", "")
+            #neg_prompt        = prompts.get(str(search_key), {}).get("negative", "")
+            #clip1 = prompts.get(str(search_key), {}).get("clip1", "")
+            #clip2 = prompts.get(str(search_key), {}).get("clip2", "")
+            #t5 = prompts.get(str(search_key), {}).get("t5", "")
             #model     = prompts.get(str(search_key), {}).get("model", "")
 
 
@@ -939,7 +964,7 @@ def main():
 
             msgg2 = f"*Wait time: **up to 40sec***"           
             #msgg2 = f"*Wait time: **up to 40sec***\nInfo: https://discord.com/channels/1030490392057085952/1132935102813454396"
-            embed_msg = embed = discord.Embed(description=t5, color=0x0000ff)
+            embed_msg = embed = discord.Embed(description=msg_prompt, color=0x0000ff)
             
             # embed_redo = embed = discord.Embed(description=msg_prompt, color=0xff0000)
             #await interaction.response.send_message("You clicked the button!") # Send a message when the button is clicked
@@ -958,7 +983,34 @@ def main():
           #      mode = "speed"
           ##  else:
           #      mode = "quality"
-            files, seed,filename = await generate_image_sd3(clip1,clip2,t5, neg_prompt, w, h, three )     
+            #files, seed,filename = await generate_image_sd3(clip1,clip2,t5, neg_prompt, w, h, three )
+            sd3_key                 = os.getenv('SD3')
+            filename = f"sd3_{int(time.time())}.jpeg"
+            file_path = f"./sd3/{filename}"
+
+            response = requests.post(
+                f"https://api.stability.ai/v2beta/stable-image/generate/ultra",
+                headers={
+                    "authorization": f"Bearer {sd3_key}",
+                    "accept": "image/*"
+                },
+                files={"none": ''},
+                data={
+                    "prompt": f"{msg_prompt}",
+                    "output_format": "jpeg",
+                    "aspect_ratio": aspect_ratio,
+                },
+            )
+
+            if response.status_code == 200:
+                with open(f"{file_path}", 'wb') as file:
+                    file.write(response.content)
+                file = discord.File(file_path)
+                #await wait_msg.delete()
+                #await wait_gif.delete()
+                #new_message = await message.reply(file=file, view=MainButtons())
+                #msg_id = new_message.id
+  
             #  VAE = False
 
                 #files, image_name  = await generate_image_playground(V4, msg_prompt, neg_prompt, w , h, keyword, three, vae, lora, support)
@@ -972,7 +1024,7 @@ def main():
             message = await channel.fetch_message(og_message)
 
 
-            new_message =   await message.reply(files=files, view=MainButtons())
+            new_message =   await message.reply(file=file, view=MainButtons())
             
             most_recent_original  = most_recent_entry["original"]
             most_recent_styled    = most_recent_entry["styled"]
@@ -998,17 +1050,10 @@ def main():
                     "original": original_content,
                     "styled": styled_content,  # Add your styled content here
                     "enchanted": enchanted_content,  # Add your enchanted content here
-                    "negative": neg_prompt,  # Add your enchanted content here
-                    "h": h,
-                    "w": w,
                     "model": model,
                     "latest_action": recent_action,
-                    "seed": seed,
-                    "clip1": clip1,
-                    "clip2": clip2,
-                    "t5": t5,
-                    "seed": seed,
-                    "filename": filename
+                    "filename": filename,
+                    "aspect_ratio": aspect_ratio
                 }
             }
             prompts.update(new_prompt)
@@ -1029,11 +1074,10 @@ def main():
             search_key = f"{Myconfig.getEchoMessageID()}"                
             msgg1 = f"*Redoing image with same prompt...*"
 
-            w                 = prompts.get(str(search_key), {}).get("w", "")
-            h                 = prompts.get(str(search_key), {}).get("h", "")
+            aspect_ratio = "1:1"
             model             = prompts.get(str(search_key), {}).get("model", "")
             
-            await self.common_button_function(w, h, three,search_key, msgg1, redo, model )
+            await self.common_button_function( three,search_key, msgg1, redo, model, aspect_ratio )
 
             #  print(f"The button was pressed on message with ID: {message_id}")
 
@@ -1053,26 +1097,20 @@ def main():
             await self.common_button_function(w, h, three,search_key, msgg1, redo, model )
 
 
-        @discord.ui.button(label="8:5", custom_id="8:5_button", row = 2, style=discord.ButtonStyle.primary) # Create a button with the label "😎 Click me!" with color Blurple
+        @discord.ui.button(label="3:2", custom_id="8:5_button", row = 2, style=discord.ButtonStyle.primary) # Create a button with the label "😎 Click me!" with color Blurple
         async def landsp85_redo_button_callback(self,interaction, button ):
             await interaction.response.defer()
 
             search_key = f"{Myconfig.getEchoMessageID()}"
             model             = prompts.get(str(search_key), {}).get("model", "")
-            mode     = prompts.get(str(search_key), {}).get("mode", "")
-            if mode == "elle":
-                w = 768
-                h = 512
-            else:
-                w = 1216
-                h = 768
+ 
             redo = False
             three = False
-            msgg1 = f"*Redoing image with 8:5 aspect ratio...*"
+            msgg1 = f"*Redoing image with 3:2 aspect ratio...*"
             #message_id = interaction.message.id
+            aspect_ratio = "3:2"
 
-
-            await self.common_button_function(w, h, three,search_key, msgg1, redo, model )
+            await self.common_button_function(three,search_key, msgg1, redo, model, aspect_ratio )
 
 
 
@@ -1083,20 +1121,14 @@ def main():
 
             search_key = f"{Myconfig.getEchoMessageID()}"
             model             = prompts.get(str(search_key), {}).get("model", "")
-            mode     = prompts.get(str(search_key), {}).get("mode", "")
-            if mode == "elle":
-                w = 768
-                h = 512
-            else:
-            
-                w = 1344
-                h = 768
+ 
             redo = False
             three = False
             msgg1 = f"*Redoing image with 16:9 aspect ratio...*"
+            aspect_ratio = "16:9"
             #message_id = interaction.message.id
 
-            await self.common_button_function(w, h, three,search_key, msgg1, redo, model )
+            await self.common_button_function(three,search_key, msgg1, redo, model, aspect_ratio )
 
 
 
@@ -1106,24 +1138,17 @@ def main():
 
             search_key = f"{Myconfig.getEchoMessageID()}"
             model             = prompts.get(str(search_key), {}).get("model", "")
-            mode     = prompts.get(str(search_key), {}).get("mode", "")
-            if mode == "elle":
-                w = 768
-                h = 512
-            else:
-            
-                w = 1536
-                h = 640
             redo = False
             three = False
             msgg1 = f"*Redoing image with 21:9 aspect ratio...*"
+            aspect_ratio = "21:9"
             # message_id = interaction.message.id
 
-            await self.common_button_function(w, h, three,search_key, msgg1, redo, model )
+            await self.common_button_function(three,search_key, msgg1, redo, model, aspect_ratio )
 
 
 
-        @discord.ui.button(label="Upscale x2", custom_id="upscalex2_button", row = 2, style=discord.ButtonStyle.secondary) # Create a button with the label "😎 Click me!" with color Blurple
+        @discord.ui.button(label="Upscale x2", custom_id="upscalex2_button", row = 2, style=discord.ButtonStyle.secondary, disabled = True) # Create a button with the label "😎 Click me!" with color Blurple
         async def upscalex2_redo_button_callback(self, interaction, button ):
             await interaction.response.defer()
 
@@ -1226,26 +1251,18 @@ def main():
                 print(f"Error: {e}")
 
 
-        @discord.ui.button(label="5:8", custom_id="5:8_button", row = 3, style=discord.ButtonStyle.primary) # Create a button with the label "😎 Click me!" with color Blurple
+        @discord.ui.button(label="2:3", custom_id="5:8_button", row = 3, style=discord.ButtonStyle.primary) # Create a button with the label "😎 Click me!" with color Blurple
         async def port58_redo_button_callback(self,interaction, button ):
             await interaction.response.defer()
             
             search_key = f"{Myconfig.getEchoMessageID()}"
             model             = prompts.get(str(search_key), {}).get("model", "")
-            mode     = prompts.get(str(search_key), {}).get("mode", "")
-            if mode == "elle":
-                w = 512
-                h = 768
-            else:
-
-                w = 768
-                h = 1216
             redo = False
             three = False
-            msgg1 = f"*Redoing image with 5:8 aspect ratio...*"
+            msgg1 = f"*Redoing image with 2:3 aspect ratio...*"
             #message_id = interaction.message.id
-
-            await self.common_button_function(w, h, three,search_key, msgg1, redo, model )
+            aspect_ratio = "2:3"
+            await self.common_button_function(three,search_key, msgg1, redo, model, aspect_ratio )
 
 
 
@@ -1254,20 +1271,13 @@ def main():
 
             search_key = f"{Myconfig.getEchoMessageID()}"
             model             = prompts.get(str(search_key), {}).get("model", "")
-            mode     = prompts.get(str(search_key), {}).get("mode", "")
-            if mode == "elle":
-                w = 512
-                h = 768
-            else:
-
-                w = 768
-                h = 1344
             three = False
             redo = False
             msgg1 = f"*Redoing image with 9:16 aspect ratio...*"
+            aspect_ratio = "9:16"
             #message_id = interaction.message.id
 
-            await self.common_button_function(w, h, three,search_key, msgg1 ,redo, model )
+            await self.common_button_function(three,search_key, msgg1 ,redo, model, aspect_ratio )
 
 
 
@@ -1277,21 +1287,13 @@ def main():
 
             search_key = f"{Myconfig.getEchoMessageID()}"
             model             = prompts.get(str(search_key), {}).get("model", "")
-            mode     = prompts.get(str(search_key), {}).get("mode", "")
-            if mode == "elle":
-                w = 512
-                h = 768
-            else:
-
-
-                w = 640
-                h = 1536
             three = False
             redo = False
             msgg1 = f"*Redoing image with 9:21 aspect ratio...*"
             #message_id = interaction.message.id
+            aspect_ratio = "9:21"
 
-            await self.common_button_function(w, h, three,search_key, msgg1 ,redo, model )
+            await self.common_button_function(three,search_key, msgg1 ,redo, model, aspect_ratio )
 
 
 
@@ -1379,12 +1381,6 @@ def main():
             search_key = f"{Myconfig.getEchoMessageID()}"
             model             = prompts.get(str(search_key), {}).get("model", "")
             mode     = prompts.get(str(search_key), {}).get("mode", "")
-            if mode == "elle":
-                w = 512
-                h = 512
-            else:
-                w = 1024
-                h = 1024
             keyword = "echo"
             await Myconfig.getEchoButtons().delete()
 
@@ -1402,22 +1398,12 @@ def main():
             enchanted_content = prompts.get(str(search_key), {}).get("enchanted", "")
             original_content  = prompts.get(str(search_key), {}).get("original", "")
             styled_content    = prompts.get(str(search_key), {}).get("styled", "")
-            neg_prompt        = prompts.get(str(search_key), {}).get("negative", "")
-            w                 = prompts.get(str(search_key), {}).get("w", "")
-            h                 = prompts.get(str(search_key), {}).get("h", "")
             model             = prompts.get(str(search_key), {}).get("model", "")
             mode              = prompts.get(str(search_key), {}).get("mode", "")
             og_message        = prompts.get(str(search_key), {}).get("og_message", "")
+            aspect_ratio      = prompts.get(str(search_key), {}).get("aspect_ratio", "")
             #ratio             = prompts.get(str(search_key), {}).get("ratio", "")
-            if model == "sdxlUnstableDiffusers_v9DIVINITYMACHINE.safetensors":
-                vae = True
-            else:
-                vae = False
-
-            if model == "leosamsHelloworldSDXLModel_helloworldSDXL20.safetensors":
-                vae = True
-            else:
-                vae = False
+  
 
            # neg_prompt = "(worst quality, low quality, illustration, 3d, 2d, painting, cartoons, sketch)"
 
@@ -1426,15 +1412,12 @@ def main():
             else:
                 msg_prompt = styled_content
 
-            if model == "sdxlUnstableDiffusers_v8HeavensWrathVAE.safetensors" or model == "sdXL_v10VAEFix.safetensors":
-                lora = True
-            else:
-                lora = False
+
 
 
             enhancing_msg = "*enchanting prompt....*"
             enchanting =  await channel.send(enhancing_msg) 
-            ench_prompt = await enchPrompt_gpt4o("hyper detailed, " + original_content)
+            ench_prompt = await enchPrompt_gpt4o(original_content)
             #support = await enchPrompt_support(msg_prompt)
             support = ench_prompt
             await enchanting.delete()
@@ -1461,7 +1444,28 @@ def main():
             wait_gif = await channel.send("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdmgwNGgxazBlMGxpNjl3amV0ZDRibHl4ZGY1Nnp1MXdqM2Iyd2QzaSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/BASS1qt1KIQ2HTD5Gs/source.gif")
 
             three = False
-            files, seed, filename = await generate_image_sd3(ench_prompt,neg_prompt, w, h, three )
+            sd3_key                 = os.getenv('SD3')
+            filename = f"sd3_{int(time.time())}.jpeg"
+            file_path = f"./sd3/{filename}"
+
+            response = requests.post(
+                f"https://api.stability.ai/v2beta/stable-image/generate/ultra",
+                headers={
+                    "authorization": f"Bearer {sd3_key}",
+                    "accept": "image/*"
+                },
+                files={"none": ''},
+                data={
+                    "prompt": f"{ench_prompt}",
+                    "output_format": "jpeg",
+                    "aspect_ratio": aspect_ratio,
+                },
+            )
+
+            if response.status_code == 200:
+                with open(f"{file_path}", 'wb') as file:
+                    file.write(response.content)
+                file = discord.File(file_path)
                 #files, image_name  = await generate_image_playground(V4, ench_prompt, neg_prompt, w , h, keyword, three, vae, lora, support)
             await wait_msg1.delete()
             await emb_msg.delete()
@@ -1472,7 +1476,7 @@ def main():
             channel = client.get_channel(1101461174907830312)
             message = await channel.fetch_message(og_message)
         #    new_message =   await message.reply(files=files, view=MainButtons())            
-            new_message =   await message.reply("*Enhanced*",files=files, view=MainButtons())
+            new_message =   await message.reply("*Enhanced*",file=file, view=MainButtons())
 
 
             msg_id = new_message.id
@@ -1483,14 +1487,12 @@ def main():
                     "original": original_content,
                     "styled": styled_content,  # Add your styled content here
                     "enchanted": ench_prompt,  # Add your enchanted content here
-                    "negative": neg_prompt,  # Add your enchanted content here
-                    "h": h,
-                    "w": w,
                     "model": model,
                     "latest_action": "AI Enhance",
                     "mode": mode,
                     "seed": seed,
-                    "filename": filename
+                    "filename": filename,
+                    "aspect_ratio": aspect_ratio
                 }
             }
 
@@ -1664,10 +1666,10 @@ def main():
 
    @client.event
    async def on_ready():  
-    #client.add_view(MyView()) # Registers a View for persistent listening
+    client.add_view(MyView()) # Registers a View for persistent listening
     #client.add_view(Dalle_buttons2()) # Registers a View for persistent listening
    # client.add_view(gif_buttons()) # Registers a View for persistent listening
-    #client.add_view(MainButtons()) # Registers a View for persistent listening
+    client.add_view(MainButtons()) # Registers a View for persistent listening
    # client.add_view(statsButton()) # Registers a View for persistent listening
     #client.add_view(faceid_button()) # Registers a View for persistent listening
     #client.add_view(Model_mode_buttons()) # Registers a View for persistent listening
@@ -1701,10 +1703,16 @@ def main():
     channel_id = Myconfig.getChatChannel() 
     channel = client.get_channel(channel_id)
 
-    await scan_unsaved_msg(client,channel)
-
+    
+    #await newyear(channel)
     await notify_nameday(channel)
-    await notify_weather(channel)
+
+    #await channel.send(file=discord.File("Red_and_green_illustrative_merry_christmas_card_landscape_1.png"))
+
+    #await waiting_christmas(channel)
+    #await notify_weather(channel, 'Riga', False)
+    #await notify_weather(channel, 'Liepaja', True)
+    await scan_unsaved_msg(client,channel)
    ############################## register messages up until specifc one #################################
 
    ############# Varda dienas ################
@@ -1718,7 +1726,7 @@ def main():
 
 
     # Izveido grafiku, kad sūta ziņas pats
-    asyncio.create_task(schedule_messages()) #@#
+    #asyncio.create_task(schedule_messages()) #@#
 
     channel = client.get_channel(SCREENSHOT_CHANNEL_ID)
     #channel = client.get_channel(1085598243808886944)
@@ -1895,9 +1903,6 @@ def main():
            await client.wait_for('message', check=check)
            await sent_message.delete()
 
-   @client.command(name='hello')
-   async def hello(ctx):
-        await ctx.send('https://discord.com/channels/1030490392057085952/1096805249303449680')
 
 
    chat_history = deque(maxlen=10)
@@ -1943,7 +1948,7 @@ def main():
   ########### SECURITY  ##################################
 
 #############################################################
-# 'mammu', 'mam', 'mamm', 'muterit', 'muterite', 'mutere', 'muter'
+
    pattern = re.compile(r'\b(ay|ey|ou|au|mamma|mammu|aloha|mam|mamm|muterit|muterite|mutere|muter|mama|mammai)\b')
 
 
@@ -1965,7 +1970,7 @@ def main():
              if author_name == "theeight":
                  author_name = "Aģents E" 
              if author_name == "daisyvongrim":
-                 author_name = "prosta desa" 
+                 author_name = "homo desa" 
              if author_name == "megga7866":
                  author_name = "Aģente K"
              if author_name == "mitraisbandits":
@@ -1985,31 +1990,6 @@ def main():
           await client.process_commands(message)
           return
         
-        #print(message.reference.resolved.attachments[0].url)
-     #   if message.content == '!hidden':
-     #       with open('image1.png', 'rb') as f1, open('image2.png', 'rb') as f2, open('image3.png', 'rb') as f3:
-      #          file1 = discord.File(f1, filename='image1.png')
-     #           file2 = discord.File(f2, filename='image2.png')
-     #           file3 = discord.File(f3, filename='image3.png')
-        
-     #       embed = discord.Embed(title='Hidden message', description='Click the 👀 reaction to reveal the message. View at your own risk, NSFW content possible.')
-     #       sent_message = await message.channel.send(embed=embed)
-     #       await sent_message.add_reaction('👀')
-
-      #      def check(reaction, user):
-       #         return str(reaction.emoji) == '👀' and user != client.user
-
-     #       try:
-     #           reaction, user = await client.wait_for('reaction_add', timeout=15.0, check=check)
-     #       except asyncio.TimeoutError:
-      #          await sent_message.clear_reactions()
-      #          return
-
-       #     revealed_embed = discord.Embed(title='Revealed message', description='This message was hidden and is now revealed.')
-       #     revealed_embed.set_image(url='attachment://image1.png')
-       #     await sent_message.edit(embed=revealed_embed, files=[file1, file2, file3])
-       #     await sent_message.clear_reactions()
-
 
         ################# SECURITY ######################
         if message.guild is None:
@@ -2057,6 +2037,7 @@ def main():
 
         random.seed(time.time())
         selected_tone = random.choice(tones)
+        #selected_tone = "new year festive"
         selected_tone = selected_tone.upper()
         #selected_tone = "rude clown"
         if 'apsveic' in message.content:
@@ -2074,7 +2055,7 @@ def main():
 
 
 
-        # Ignorēt ziņas no citiem botiem
+
 ########################### UPDATED ###################
         # Ignorēt ziņas no citiem botiem
         if message.author.bot:
@@ -2117,13 +2098,7 @@ def main():
              if author_name == "Resnā mamma":
                  author_name = "Elizabete"
 
-             add_username_and_id_if_not_exists(author_name, ID, file_to_update)
-
-
-             with open("data.txt", "a") as file:
-                    file.write(f'"{author_name}": "{ID}"\n')  # You can adjust the indent for pretty printing
-
-           
+             add_username_and_id_if_not_exists(author_name, ID, file_to_update)           
 
 
             # env variables
@@ -2168,7 +2143,6 @@ def main():
         if pattern.search(message.content.lower()):
             hasImage = False
 
-            # izņem atslēgas vārdu
             message_modif = message.content.lower()
             # Pārbauda vai ir pieminēts lietotājs ziņā
             parts = message.content.split() #@#
@@ -2176,14 +2150,29 @@ def main():
             response = None
 
             #Check if message contains image
-            if message.reference is not None:
-                try:
+            #if message.reference is not None:
+            try:
+                #zina_ar_bildi = await message.channel.fetch_message(message.reference.message_id)
+                if message.reference is not None:
                     zina_ar_bildi = await message.channel.fetch_message(message.reference.message_id)
-                    bildes_url =  zina_ar_bildi.attachments[0].url
+                    bildes_url = zina_ar_bildi.attachments[0].url
                     hasImage = True
-                except Exception as e:
+                elif message.attachments:
+                    bildes_url = message.attachments[0].url
+                    hasImage = True
+                else:
                     hasImage = False
-                    print(f"An error occurred: {e}")           
+            except Exception as e:
+                hasImage = False
+                print(f"An error occurred: {e}")
+            if 'attachment' in message.content.lower():
+                # Extract the first URL containing the word 'attachment' from the message
+                url_match = re.search(r'https?://[^\s]*attachment[^\s]*', message.content)
+                if url_match:
+                    bildes_url = url_match.group(0)
+                    hasImage = True
+                else:
+                    hasImage = False        
             try: #@@##
                 # assuming 'message' is the message object you want to process
                 message_text = message.content
@@ -2209,14 +2198,14 @@ def main():
                  question, web_link = extract_text_and_link(message_modif)
             #if message.author.id == 909845424909729802:
             #    return
-            key_word = ["pajautā jautājumu", "atdarini", "gudrais"]
+            key_phrase = ["pajautā jautājumu", "atdarini", "gudrais"]
 
                     
 
                     
 
 
-            if  any(word in message_modif for word in key_word) and mentioned_user:
+            if  any(word in message_modif for word in key_phrase) and mentioned_user:
                 if message_modif.startswith('pajautā jautājumu'):
                     random.seed(time.time())
                     response = random.choice(question_list)
@@ -2744,8 +2733,9 @@ def main():
                         msgg = "*Echoing landscape image... wait time: **up to 40sec*** \nInfo: https://discord.com/channels/1030490392057085952/1132935102813454396"
                      #   if AI:
                       #      msgg = "*Echoing AI prompt enhanced landscape image... wait time: **up to 40sec*** \nInfo https://discord.com/channels/1030490392057085952/1132935102813454396"
-
-                    input_en = prompt
+                    keyword = message_modif.split()[0]
+                    input_en = message.content.lower().split(keyword)[1]
+                    #input_en = prompt
 
 
 
@@ -2849,6 +2839,8 @@ def main():
                             new_prompt = {
                                 f"{msg_id}": {
                                     "original": input_en,
+                                    "styled": "",
+                                    "enchanted": "",
                                     "og_message": message.id,
                                     "model": "sd3",
                                     "aspect_ratio": "1:1",
@@ -3013,6 +3005,39 @@ def main():
                 await message.channel.send(response)
                 return
 
+            elif  message.reference is None and hasImage:
+                bildes_url =  message.attachments[0].url
+                current_zina = message_modif
+                gpt_key               = os.getenv("GPT")
+                await message.channel.typing()
+
+
+                client_chat = OpenAI(api_key=gpt_key)
+
+                responsee = client_chat.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": f"'Your name is 'Elizabete'. People also call you 'mamma'. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji"},
+                    {
+                        "role": "user",
+                        "content": [
+                        {"type": "text", "text": f"user wrote '{current_zina} give generic human like short or medium  answer in context in latvian add your opinion. Do not as questions."},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                            "url": bildes_url,
+                            },
+                        },
+                        ],
+                    }
+                    ],
+                    max_tokens=1000,
+                    temperature=0.6,
+                )
+                response = responsee.choices[0].message.content
+                await message.channel.send(response)
+                return                    
+
             elif message.reference and (pattern.search(message.content.lower())):
                     if message.author == client.user:
                         return
@@ -3124,9 +3149,43 @@ def main():
                 response = random.choice(triger_KoDari["Ko dari"]) #@#
             elif re.match(r".*\bkā(\s+\S+)?\s+iet\s*\?", message_modif.lower()) or re.match(r".*\bka(\s+\S+)?\s+iet\s*\?", message_modif.lower()): #@#
                 response = random.choice(triger_KaIet["Ka iet"]) #@# 
-          #  elif '?' in message_modif or message.channel.id == 1101461174907830312 or message.author.id == 909845424909729802 or mentioned_user: # 1101461174907830312 - ģenerē-general channel id
-            elif '?' in message_modif or "pasaki" in message_modif or "iesaki" in message_modif or "pastāsti" in message_modif or "pastasti" in message_modif or  "atvainojies" in message_modif or  "apsveic" in message_modif or message.channel.id == 1101461174907830312  or mentioned_user: # 1101461174907830312 - ģenerē-general channel id   ### hasijs or message.author.id == 242298879784124416
+          
+          
+            elif  '?' in message_modif or "pasaki" in message_modif or "iesaki" in message_modif or "pastāsti" in message_modif or "pastasti" in message_modif or  "atvainojies" in message_modif or  "apsveic" in message_modif or message.channel.id == 1101461174907830312  or mentioned_user or message.author.id == 214068457149431809: # 1101461174907830312 - ģenerē-general channel id   ### hasijs or message.author.id == 242298879784124416
                 current_zina = message_modif
+                if hasImage:
+                    #zina_ar_bildi = await message.channel.fetch_message(message.reference.message_id)
+                    bildes_url =  message.attachments[0].url
+                    current_zina = message_modif
+                    gpt_key               = os.getenv("GPT")
+                    await message.channel.typing()
+
+
+                    client_chat = OpenAI(api_key=gpt_key)
+
+                    responsee = client_chat.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "system", "content": f"'Your name is 'Elizabete'. People also call you 'mamma'. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji"},
+                        {
+                            "role": "user",
+                            "content": [
+                            {"type": "text", "text": f"user wrote '{current_zina} give generic human like short or medium  answer in context in latvian add your opinion. Do not as questions."},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                "url": bildes_url,
+                                },
+                            },
+                            ],
+                        }
+                        ],
+                        max_tokens=1000,
+                        temperature=0.6,
+                    )
+                    response = responsee.choices[0].message.content
+                    await message.channel.send(response)
+                    return                    
                 #selected_tone = "grounded nostalgic tone"
                 #use_GPT = False
                 await message.channel.typing()
@@ -3291,7 +3350,7 @@ def main():
                    response = izteles_auglis
                    await message.channel.send(response)
                    return
-               
+
             elif hasImage:
                 #zina_ar_bildi = await message.channel.fetch_message(message.reference.message_id)
 
@@ -3390,7 +3449,7 @@ def main():
                     await message.channel.send(response)
                     return
             
-            elif (client.user.mentioned_in(message) or (message.reference is not None and message.reference.resolved.author.id == client.user.id)) and ('?' in message.content or "pasaki" in message.content or "iesaki" in message.content or "pastāsti" in message.content or "pastasti" in message.content): #  or message.author.id == 242298879784124416
+            elif (client.user.mentioned_in(message) or (message.reference is not None and message.reference.resolved.author.id == client.user.id)) and ('?' in message.content or "pasaki" in message.content or "iesaki" in message.content or "pastāsti" in message.content or "pastasti" in message.content or message.author.id == 214068457149431809): #  or message.author.id == 242298879784124416
            # if message.reference is not None and message.reference.resolved.author.id == client.user.id:  
                 replied_zina = ''
                 if message.reference is not None and message.reference.resolved.author.id == client.user.id:                  
@@ -3657,10 +3716,15 @@ def main():
         channel = client.get_channel(Myconfig.getChatChannel()) 
         #await channel.send("*Kicking suspicious account...*")
         await channel.send("*suspicious account joined...* Ko ta tu te??? ")
-
- #  @client.event
- # async def on_presence_update(before, after):
- #      if before.id == 391668973315424277:
+   
+  # @client.event
+  # async def on_presence_update(before, after):
+   #    global firstBoot
+   #    role_ids_to_check = [1030544437262155846, 1061383886074040352, 1089589791466721312, 1278355030486945879]
+       #channel = client.get_channel(1097995867090333706)
+   #    await trackActivity(before, after, role_ids_to_check, firstBoot)
+   #    if firstBoot == True:
+    #       firstBoot = False       
  #          global execute_code
  #          if before.activity != after.activity:  # to only run on status
  #              try:
