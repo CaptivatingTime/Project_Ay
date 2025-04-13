@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /ResnsCounter/generatedNewAge
 /ResnsCounter/text to speach
+.env
