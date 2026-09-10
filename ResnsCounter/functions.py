@@ -14,6 +14,9 @@ from discord.ext import commands
 import discord
 import python_weather
 from datetime import time
+from xai_sdk import Client
+from xai_sdk.chat import user, system, image
+from xai_sdk.tools import web_search, x_search
 
 load_dotenv()
 gpt_key               = os.getenv("GPT")
@@ -32,12 +35,12 @@ async def get_threadID():
         thread_ids = json.load(file)
 
     if today not in thread_ids:
-        thread = await client_gpt.beta.threads.create()
+        conversation = await client_gpt.conversations.create()
         new_entry = {
-            f"{today}":{
-                "thread_id": thread.id
-                }
+            f"{today}": {
+                "thread_id": conversation.id
             }
+        }
         thread_ids.update(new_entry)
         with open("all_threads.json", "w") as file:
             json.dump(thread_ids, file, indent=4)  # You can adjust the indent for pretty printing
@@ -108,9 +111,12 @@ async def notify_nameday(channel):
     with open('namedays.json', 'r', encoding='utf-8') as file:
         name_days = json.load(file)
     if today not in namedays_showed:
+        namedays_showed.append(today)
+        with open('namedays_showed.json', 'w', encoding='utf-8') as file:
+            json.dump(namedays_showed,file)         
         if today in name_days:
             names = ", ".join(name_days[today])
-            await channel.send(f"Šodien({today}) vārda dienu svin 🍄 : {names}")
+            await channel.send(f"Šodien({today}) vārda dienu svin 🍂 : {names}")
         else:
             await channel.send(f"Šodien({today}) neviens nesvin vārda dienu.")
 
@@ -133,6 +139,101 @@ async def ElizabeteGPT(mind, tone):
     )
     response = responsee.choices[0].message.content
     return response    
+
+
+async def searchGROK(message):
+    client = Client(api_key=os.getenv("XAI_API_KEY"))
+    pattern = re.compile(r'\b(ko cilvēki saka|ko cilveki saka|tvito|twito|tvīto|twīto|twitterī|twiteri|twiterī|tviteri|tviterī)\b')
+    if pattern.search(message.lower()):
+        chat = client.chat.create(
+            model="grok-4.6",  # reasoning model
+            tools=[x_search()],
+            include=["verbose_streaming"],
+            store_messages=False     
+        )
+        print("X search")
+    else:
+    
+        chat = client.chat.create(
+            model="grok-4.6",  # reasoning model
+            tools=[web_search()],
+            include=["verbose_streaming"],
+            store_messages=False
+        )
+    chat.append(user(message))
+    is_thinking = True
+    result = ""
+    for response, chunk in chat.stream():
+        for tool_call in chunk.tool_calls:
+            print(f"\nCalling tool: {tool_call.function.name} with arguments: {tool_call.function.arguments}")
+        if response.usage.reasoning_tokens and is_thinking:
+            print(f"\rThinking... ({response.usage.reasoning_tokens} tokens)", end="", flush=True)
+        if chunk.content and is_thinking:
+            print("\n\nFinal Response:")
+            is_thinking = False
+        if chunk.content and not is_thinking:
+            print(chunk.content, end="", flush=True)
+            result += chunk.content
+    print("\n\nCitations:")
+    print(response.citations)  
+    
+    return result
+
+
+async def checkIfNeedSearch (current_message, replied_message):
+    result = ""
+    pattern = re.compile(r'\b(atrodi|samekē|samekle|iegugle|iegūglē|ko cilvēki saka|ko cilveki saka|tvito|twito|tvīto|twīto|twitterī|twiteri|twiterī|tviteri|tviterī)\b')
+    if pattern.search(current_message.lower()):
+        need_search = True
+        
+    else:
+    #    client = Client(
+    #        api_key=os.getenv("XAI_API_KEY")
+    #    )
+    #    chat = client.chat.create(model="grok-4.6", store_messages=False)
+    #    
+    #    if replied_message:
+    #        chat.append(system("I will provide message and response message to it. You need to determine if for these messages xai would need to make web search for most accurate response. Respond only with True of False."))
+    #        chat.append(user(f"Message: [{replied_message}], response message to it: [{current_message}]. Respond with True if need web search, respond wih False if don't need"))
+    #        
+    #    else:
+    #        chat.append(system("I will provide message. You need to determine if for this message xai would need to make web search for most accurate response. Respond only with True of False"))
+    #        chat.append(user(f"Message: [{current_message}]. Respond with True if need web search, respond wih False if don't need"))
+    #        
+    #    response = chat.sample()
+    #    result = response.content
+    #    need_search = result.lower() in ('true', 'yes', '1')
+        need_search = False
+        print(need_search)
+    
+    #if need_search:
+     #   result = await searchGROK(current_message)
+    
+    return need_search
+    
+async def ElizabeteGROK(system_content, user_content, hasImage, bildes_url, needSearch):
+
+    client = Client(
+        api_key=os.getenv("XAI_API_KEY")
+    )
+    
+    if hasImage:
+        chat = client.chat.create(model="grok-4.6", store_messages=False)
+        chat.append(
+            user(
+                user_content,
+                image(image_url=bildes_url, detail="high"),
+            )
+        )
+    else:
+
+            chat = client.chat.create(model="grok-4.6", store_messages=False)
+            chat.append(system(system_content))
+            chat.append(user(user_content))
+        
+    response = chat.sample()
+    content = response.content
+    return content
 
 async def notify_weather(channel):
     with open('namedays_showed.json', 'r', encoding='utf-8') as file:
@@ -223,14 +324,15 @@ def replace_starting_phrase(sentence, starting_phrase, new_word):
 
 
 
-async def add_message_to_thread(client_gpt,thread_id, user_question):
-    # Create a message inside the thread
-    message = await client_gpt.beta.threads.messages.create(
-        thread_id=thread_id,
-        role="user",
-        content= user_question
+async def add_message_to_thread(client_gpt, thread_id, user_question):
+
+    response = await client_gpt.responses.create(
+        model="gpt-4o",
+        conversation=thread_id,
+        input=user_question
     )
-    return message
+
+    return response
 
 async def scan_unsaved_msg(client, channel):
     with open("most_recent_saved_msg.json", "r") as file:
@@ -403,5 +505,138 @@ async def scan_unsaved_msg(client, channel):
     latest_msg_ID["ID"] = message.id
     with open("most_recent_saved_msg.json", "w") as file:
         json.dump(latest_msg_ID, file, indent=4)  # You can adjust the indent for pretty printing
+    with open('testt.json', 'w') as file:
+             json.dump(addition_colltected,file)
+
+
+
+async def getAllMessages(client, channel):
+  
+
+       
+
+    messages = []
+    
+    msg1 = "None"
+    msg2 = "None"
+    msg1_temp = ""
+    i = 0
+    n = 0    
+    
+    gpt_key               = os.getenv("GPT")
+
+    async for message in channel.history(limit=None, oldest_first=False):
+
+        #if message.id == 1205541078363541546:
+        #print(message)
+        print(n)
+        n = n+1
+            #   break
+            
+        messages.append(message)
+        #print(message)
+    #print(latest_msg_ID["ID"])
+    messages_rev = reversed(messages)
+
+# You can adjust the indent for pretty printing
+    pattern = re.compile(r'\b(ay|ey|ou|au|mamma|mammu|aloha|mam|mamm|muterit|muterite|mutere|muter|mama|mammai|mammas)\b')
+    for message in messages_rev:
+
+
+                 if msg1 != "None" and msg2 == "None":
+                     msg2 = message.content
+                     if message.attachments:
+                         for att in message.attachments:
+                              url = att.url 
+                              msg2 = f"{msg2}\n{url}"
+                 if msg1 == "None":
+                     msg1 = message.content
+                     #msg1_temp = msg1
+                     msg1 = preprocess_message(msg1)
+                     if  message.attachments:
+                         for att in message.attachments:
+                              url = att.url 
+                              msg1 = f"{msg2}\n{url}"
+                 if msg1 != "None" and msg2 != "None":
+                    # temp = msg1
+                   
+                    if message.reference:
+                       try:
+                        if message.reference.resolved:
+                            msg1 = message.reference.resolved.content
+                        else:
+                            
+                            msg1_id = message.reference.message_id
+                            
+                            msg1_full = await channel.fetch_message(msg1_id)
+                            
+
+                           # replied_zina = replied_message.content
+                            msg1 = msg1_full.content
+                        if  message.reference.resolved is not None:
+                            if  message.reference.resolved.attachments:
+                              for att in message.attachments:
+                                  url = att.url 
+                                  msg1 = f"{msg1}\n{url}"
+                                  msg1 = preprocess_message(msg1)
+                        msg2 = message.content
+                        if  message.attachments:
+                          for att in message.attachments:
+                              url = att.url 
+                              msg2 = f"{msg2}\n{url}"
+                       except:
+                         print("ERROR")
+                         created_at_utc = message.created_at.replace(tzinfo=pytz.utc)
+                         desired_timezone = pytz.timezone("Africa/Bujumbura")
+                         created_at_local = created_at_utc.astimezone(desired_timezone)
+   
+                         time_stamp = created_at_local.strftime('%d-%m %H:%M:%S')
+                         name = message.author.name
+                         new_message = f"{name}[{time_stamp}]:  '{message.content}'"
+                         print(new_message)
+                         if message.content != msg1:
+                            msg2 = message.content
+                            if  message.attachments:
+                              for att in message.attachments:
+                                  url = att.url 
+                                  msg2 = f"{msg2}\n{url}"
+                    else:
+                     if message.content != msg1:
+                        msg2 = message.content
+                        if  message.attachments:
+                          for att in message.attachments:
+                              url = att.url 
+                              msg2 = f"{msg2}\n{url}"
+                    #print(f"msg1: {msg1}\nmsg2: {msg2}\n\n")
+
+                    msg2 = replace_starting_phrase(msg2, "mammu", "pipsi")
+                    msg2 = replace_starting_phrase(msg2, "ay gudrais", "pipsi")
+                    msg2 = replace_starting_phrase(msg2, "ey gudrais", "pipsi")
+                    addPair('testt.json', msg1, msg2)
+                    msg1 = msg2
+                    msg1 = preprocess_message(msg1)
+                 i = i+1
+                 name = message.author.name
+                 if message.author.name == "Resnā mamma":
+                    name = "Elizabete"
+                 else: 
+                   name = message.author.name
+
+                 created_at_utc = message.created_at.replace(tzinfo=pytz.utc)
+                 desired_timezone = pytz.timezone("Africa/Bujumbura")
+                 created_at_local = created_at_utc.astimezone(desired_timezone)
+   
+                 time_stamp = created_at_local.strftime('%d-%m %H:%M:%S')
+                 new_message = f"{name}[{time_stamp}]:  '{message.content}'"
+                 thread_id = await get_threadID()
+                # await add_message_to_thread(client_gpt, thread_id, new_message)
+                 print(new_message)
+                 #if i == 57:
+                 #   await asyncio.sleep(60)
+             
+                    #amount = amount + i
+                 #   i = 0
+
+
     with open('testt.json', 'w') as file:
              json.dump(addition_colltected,file)

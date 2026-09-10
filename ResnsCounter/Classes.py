@@ -51,7 +51,7 @@ class Config():
         self.thread_id = ''
         self.additionMsgs = []
         self.additionMsgs_colltected = []
-        self.chatChannel = 1097995867090333706 
+        self.chatChannel = 1030490392510079063  
 
     def setElizabeteLastMsg(self,state):
         self.elizabeteLastMsg = state

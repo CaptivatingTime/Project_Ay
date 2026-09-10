@@ -55,8 +55,11 @@ from functions import (getTime,
                        notify_nameday,
                        notify_weather,
                        timeOfDay,
-                       waiting_christmas,
-                       newyear
+                       getAllMessages,
+                       ElizabeteGROK,
+                       checkIfNeedSearch,
+                       searchGROK
+
                       )
 
 from slash_commands import (resnums_slash,
@@ -71,14 +74,16 @@ from chat_functions import (post_random_image,
                            )
 
 from functions_onMessage import gudrais_response
-from functions_atdarini import atdarini_person
+from functions_atdarini import atdarini_person, atdarini_person_grok
 from Classes import Config, MsgCollector
+
+import xai_sdk
+
 #from activityTracker import trackActivity
 # suppress the warning
 warnings.filterwarnings("ignore", message="The parameter 'token_pattern' will not be used since 'tokenizer' is not None'")
 
 # Ctrl + K, then Ctrl + U if you’re on Windows
-
 
 ############# gudrais ######################
 # Function to load data from JSON file
@@ -185,67 +190,69 @@ def main():
           json.dump(list, file)
 
    def getUserName(nick):
+        print(f"test {nick}")
         nickname = None
-        if nick == 'Jaanisjc':
+        if nick.lower() == 'jaanisjc':
             nickname = 'Jānis'
-        elif nick == 'DAISY':
-            nickname = 'Daisy'
-        elif nick == 'FatAndBeautiful':
+        elif nick.lower() == 'daisyvongrim':
+            nickname = 'daisyvongrim'
+        elif nick.lower() == 'FatAndBeautiful':
             nickname = 'Valters'
-        elif nick == 'MissGoldfish':
+        elif nick.lower() == 'missGoldfish':
             nickname = 'Paula'
-        elif nick == 'Theeight':
+        elif nick.lower() == 'theeight':
             nickname = 'Elvis'
-        elif nick == '𝙾𝚜𝚖𝚊𝚗𝚜':
+        elif nick.lower() == '𝙾𝚜𝚖𝚊𝚗𝚜':
             nickname = 'Oskars'
-        elif nick == 'LadyMorgie':
+        elif nick.lower() == 'ladyMorgie':
             nickname = 'Madara'
-        elif nick == 'notacop':
+        elif nick.lower() == 'notacop':
             nickname = 'notacop'
-        elif nick == 'AGRIS':
+        elif nick.lower() == 'agris':
             nickname = 'Agris'
-        elif nick == 'Ifchix':
+        elif nick.lower() == 'ifchix':
             nickname = 'Ivars'
-        elif nick == 'MitraisBandīts':
+        elif nick.lower() == 'kapars69':
             nickname = 'Kapars'
-        elif nick == 'swich125':
+        elif nick.lower() == 'swich125':
             nickname = 'swich'
-        elif nick == 'Unicorn':
+        elif nick.lower() == 'unicorn':
             nickname = 'Vectēvs'
-        elif nick == 'Megga':
+        elif nick.lower() == 'megga7866':
             nickname = 'Megana'
-        elif nick == 'ābolmaizīte':
+        elif nick.lower() == 'ābolmaizīte':
             nickname = 'ābolmaizīte'
-        elif nick == 'b1bop':
+        elif nick.lower() == 'b1bop':
             nickname = 'Bibops'
-        elif nick == 'Evol':
+        elif nick.lower() == 'Evol':
             nickname = 'Evol'
-        elif nick == 'an.XIETY':                                     
+        elif nick.lower() == 'an.XIETY':                                     
             nickname = 'anXIETY'
-        elif nick == 'gesmen':
+        elif nick.lower() == 'gesmen':
             nickname = 'gesmens'
-        elif nick == 'Kampys':
+        elif nick.lower() == 'Kampys':
             nickname = 'Kampys'
-        elif nick == 'Yogi':
+        elif nick.lower() == 'Yogi':
             nickname = 'Yogi'
-        elif nick == 'kampulis':
+        elif nick.lower() == 'kampulis':
             nickname = 'Speķmaizīte' 
-        elif nick == 'Eternal Wanderer':
+        elif nick.lower() == 'Eternal Wanderer':
             nickname = 'Mērčmeistars'
-        elif nick == 'kachis':
+        elif nick.lower() == 'kachis':
             nickname = 'kachis'
-        elif nick == 'E.N.Z.I.O':
+        elif nick.lower() == 'E.N.Z.I.O':
             nickname = 'Enzio'
-        elif nick == 'eidukS':
+        elif nick.lower() == 'eidukS':
             nickname = 'Mārtiņš'
-        elif nick == 'Atty':
+        elif nick.lower() == 'Atty':
             nickname = 'Atty' 
-        elif nick == 'TomTryptamine':
+        elif nick.lower() == 'TomTryptamine':
             nickname = 'Tom'
-        elif nick == 'Mammu mīlētājs desmens':
+        elif nick.lower() == 'Mammu mīlētājs desmens':
             nickname = 'Desmens'
-        elif nick == "ᵢₑᵥᵢₙₐ":
-            nickname  = "Ieva"
+        elif nick.lower() == "haskijs":
+            nickname  = "haskijs (female)"
+        print(f"test {nickname}")
         if nickname is not None:
 
             return nickname
@@ -351,31 +358,6 @@ def main():
    async def stop_slash(interaction: discord.Interaction):
        await stop_music(interaction, client) 
 
-   @client.tree.command(name="muteall", description="mute all people")
-   async def mute_all_except_roles(interaction: discord.Interaction):
-    allowed_role_id = 1030491560397246494  # ID of the role that can use this command
-    role1_id = 1030491560397246494  # First exempt role ID
-    role2_id = 1295909785094586448  # Second exempt role ID
-
-    # Check if the user has the allowed role to use this command
-    if discord.utils.get(interaction.user.roles, id=allowed_role_id):
-        if interaction.user.voice and interaction.user.voice.channel:
-            voice_channel = interaction.user.voice.channel
-
-            for member in voice_channel.members:
-                has_role1 = discord.utils.get(member.roles, id=role1_id)
-                has_role2 = discord.utils.get(member.roles, id=role2_id)
-
-                # Mute the member if they do not have both exempt roles
-                if not (has_role1 and has_role2):
-                    await member.edit(mute=True)
-
-            await interaction.response.send_message("Muted all members without the specific roles.", ephemeral=True)
-        else:
-            await interaction.response.send_message("You're not in a voice channel.", ephemeral=True)
-    else:
-        await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
-
    #Chatbot initialization
    pairs, response_list, lv_reflections = Chatbot()
    #chatbot = Chat(pairs, lv_reflections) # disabled 02.10.2024
@@ -417,49 +399,54 @@ def main():
             channel = client.get_channel(Myconfig.getChatChannel()) 
 
 
-            now = datetime.now() + timedelta(hours=1 )
-            post_time = now + timedelta(hours=1)
-            # Print the scheduled message post time
-            print(f"\nNext Resnas mammas response message will be posted at: {post_time.strftime('%H:%M:%S')}\n") 
-            await asyncio.sleep(14400)
-            if Myconfig.getElizabeteLastMsg() == False: 
-                await post_reply_message(channel, client, pairs, response_list)
-
-            now = datetime.now() + timedelta(hours=1 )
-            post_time = now + timedelta(hours=2)
-            # Print the scheduled message post time
-            print(f"\nNext Resnas mammas random mention message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
-            print("last message sent by Elizabete: " + str(Myconfig.getElizabeteLastMsg()))
-            await asyncio.sleep(14400)  # Sleep for 3 hour
-            print("last message sent by Elizabete: " + str(Myconfig.getElizabeteLastMsg()))
-            if Myconfig.getElizabeteLastMsg() == False:
-                await post_mention_message(channel, client, pairs, response_list, question_list)
-
 
             now = datetime.now() + timedelta(hours=1 )
             # Calculate the time when the next message will be posted
-            post_time = now + timedelta(hours=2)
+            post_time = now + timedelta(hours=6)
             # Print the scheduled message post time
             print(f"\nNext Resnas mammas random message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
-            await asyncio.sleep(14400)
-            if Myconfig.getElizabeteLastMsg() == False:
-                await post_random_message(channel, client, pairs, response_list) 
+            await asyncio.sleep(21600)
+            #if Myconfig.getElizabeteLastMsg() == False:
+            await post_random_message(channel, client, pairs, response_list) 
 
-            now = datetime.now() + timedelta(hours=1 )
-            post_time = now + timedelta(hours=1 )
+            now = datetime.now() #+ timedelta(hours=1 )
+            post_time = now + timedelta(hours=3 )
             # Print the scheduled message post time
             print(f"\nNext Resnas mammas random image message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
-            await asyncio.sleep(14400)  # Sleep for 3 hour
-            if Myconfig.getElizabeteLastMsg() == False:
-                await post_random_image(channel, client, pairs, response_list)
+            await asyncio.sleep(10800)  # Sleep for 3 hour
+            #if Myconfig.getElizabeteLastMsg() == False:
+            await post_random_image(channel, client, pairs, response_list)
+
 
             now = datetime.now() + timedelta(hours=1 )
-            post_time = now + timedelta(hours=2)
+            post_time = now + timedelta(hours=3)
             # Print the scheduled message post time
-            print(f"\nNext Resnas mammas comment message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
-            await asyncio.sleep(14400)  # Sleep for 1 hour
-            if Myconfig.getElizabeteLastMsg() == False:
-                await post_comment_message(channel, client, pairs, response_list, Myconfig.getThreadID())
+            print(f"\nNext Resnas mammas random mention message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
+            print("last message sent by Elizabete: " + str(Myconfig.getElizabeteLastMsg()))
+            await asyncio.sleep(10800)  # Sleep for 3 hour
+            print("last message sent by Elizabete: " + str(Myconfig.getElizabeteLastMsg()))
+            #if Myconfig.getElizabeteLastMsg() == False:
+            await post_mention_message(channel, client, pairs, response_list, question_list)
+
+
+            now = datetime.now() + timedelta(hours=1 )
+            post_time = now + timedelta(hours=3)
+            # Print the scheduled message post time
+            print(f"\nNext Resnas mammas response message will be posted at: {post_time.strftime('%H:%M:%S')}\n") 
+            await asyncio.sleep(10800)
+            #if Myconfig.getElizabeteLastMsg() == False: 
+            await post_reply_message(channel, client, pairs, response_list)
+
+
+
+
+            #now = datetime.now() #+ timedelta(hours=1 )
+           # post_time = now + timedelta(hours=2)
+            # Print the scheduled message post time
+            #print(f"\nNext Resnas mammas comment message will be posted at: {post_time.strftime('%H:%M:%S')}\n")
+            #await asyncio.sleep(7200)  # Sleep for 1 hour
+            #if Myconfig.getElizabeteLastMsg() == False:
+            #await post_comment_message(channel, client, pairs, response_list, Myconfig.getThreadID())
 
 ###################### INTERACT IN CHAT OVER TIME ########################^
 
@@ -989,7 +976,7 @@ def main():
             file_path = f"./sd3/{filename}"
 
             response = requests.post(
-                f"https://api.stability.ai/v2beta/stable-image/generate/ultra",
+                f"https://api.stability.ai/v2beta/stable-image/generate/sd3.5-large",
                 headers={
                     "authorization": f"Bearer {sd3_key}",
                     "accept": "image/*"
@@ -1449,7 +1436,7 @@ def main():
             file_path = f"./sd3/{filename}"
 
             response = requests.post(
-                f"https://api.stability.ai/v2beta/stable-image/generate/ultra",
+                f"https://api.stability.ai/v2beta/stable-image/generate/sd3.5-large",
                 headers={
                     "authorization": f"Bearer {sd3_key}",
                     "accept": "image/*"
@@ -1713,6 +1700,7 @@ def main():
     #await notify_weather(channel, 'Riga', False)
     #await notify_weather(channel, 'Liepaja', True)
     await scan_unsaved_msg(client,channel)
+    #await getAllMessages(client,channel)
    ############################## register messages up until specifc one #################################
 
    ############# Varda dienas ################
@@ -1722,11 +1710,11 @@ def main():
 
 
     # Izveido statusuw
-    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="leafs falling 🍂🍁"))
+    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Sitting in -45C ⛄"))
 
 
     # Izveido grafiku, kad sūta ziņas pats
-    #asyncio.create_task(schedule_messages()) #@#
+    asyncio.create_task(schedule_messages()) #@#
 
     channel = client.get_channel(SCREENSHOT_CHANNEL_ID)
     #channel = client.get_channel(1085598243808886944)
@@ -1783,14 +1771,14 @@ def main():
                         sendConfirm = False # Nesūtīt paziņojumu čatā
                         isStreak = True 
                         if x + 1 == multip: sendConfirm = True 
-                        await RegisterWin(game_wins, message, recap, sendConfirm, isStreak)           
+                        #await RegisterWin(game_wins, message, recap, sendConfirm, isStreak)           
             else:
 
                 await Register_time(f"{message.created_at.hour+2}")
                 await RegTotalMonthWins(1,message.created_at.month)
                 sendConfirm = True # Nosūtīt paziņojumu čatā
                 isStreak = False  
-                await RegisterWin(game_wins, message, recap, sendConfirm, isStreak) 
+                #await RegisterWin(game_wins, message, recap, sendConfirm, isStreak) 
                 MyMsgCollector.setPreviousWins(MyMsgCollector.getPreviousWins() + 1)
 
     filename = "temp_win_recap.json"
@@ -1907,9 +1895,11 @@ def main():
 
    chat_history = deque(maxlen=10)
    def add_message_chat_history(sender, message):
-        chat_history.append(f'"{sender}": "{message}"')
+        chat_history.append(f"[{sender}]: {message}")
    def get_chat_history():
-        return "chat_history = '''\n" + ",\n".join(chat_history) + "\n'''"
+        if not chat_history:
+                return ""  # Or a default empty history message.
+        return "Chat History:\n" + "\n".join(chat_history) + "\n\n"  # Extra newline to separate from the new prompt.
    
    
    ########### SECURITY  #################################
@@ -1962,21 +1952,21 @@ def main():
 
         
         
-        if message.channel.id == Myconfig.getChatChannel():
+        if message.channel.id == Myconfig.getChatChannel() or message.channel.id == 1330495584724979725 :
              
              author_name = message.author.name
              if author_name == "Resnā mamma":
                  author_name = "Elizabete" 
              if author_name == "theeight":
-                 author_name = "Aģents E" 
+                 author_name = "Elvis" 
              if author_name == "daisyvongrim":
-                 author_name = "homo desa" 
+                 author_name = "daisy" 
              if author_name == "megga7866":
-                 author_name = "Aģente K"
+                 author_name = "Santa"
              if author_name == "mitraisbandits":
                  author_name = "Kapars"
              if author_name == "jaanisjc":
-                 author_name = "Aģents J"                     
+                 author_name = "Jānis"                     
              add_message_chat_history(author_name,message.content)
              if message.author.bot:
                  Myconfig.setElizabeteLastMsg(True)
@@ -2037,8 +2027,11 @@ def main():
 
         random.seed(time.time())
         selected_tone = random.choice(tones)
-        #selected_tone = "new year festive"
-        selected_tone = selected_tone.upper()
+        selected_tone = "Brutally honest + savage"
+        selected_tone = "You are a sharp, witty with a sarcastic edge. Be direct, confident, and unafraid to point out nonsense or contradictions with clever one-liners. Never pander or people-please — say what you actually think, even if it's unpopular. Stay entertaining and useful, not mean or aggressive. Use sarcasm sparingly for emphasis, not as default hostility"
+        selected_tone = "You are an aggressive, no-bullshiter with zero patience for stupidity or excuses. Speak with raw confidence, strong forceful opinions, and direct aggression when calling out weak logic, lazy thinking, or wrong info — use phrases like 'that's garbage', 'cut the crap', 'wrong and here's why', 'step up or shut up'. Never pander, never soften to please people, never play nice just to be liked. Stay useful and brutally clear, but don't cross into personal insults or hostility toward the user themselves — attack bad ideas HARD, not people. Keep responses sharp, commanding, and entertainingly intense"
+        selected_tone = "assertive and unapologetic"
+        #selected_tone = selected_tone.upper()
         #selected_tone = "rude clown"
         if 'apsveic' in message.content:
             selected_tone = "festive"
@@ -2079,13 +2072,6 @@ def main():
             Myconfig.setMesageNr(0)
             Myconfig.setReaction_threshold()
         
-
-        if "onlyfan leaks here" in message.content.lower():
-            admin = client.get_user(240554122510598146)
-            await admin.send(f"SPAM DETECTED! Message from {message.author} in {message.channel.name}: {message.content}")
-
-            await message.delete()
-            return
 ########################### UPDATED ###################
 
 
@@ -2119,7 +2105,7 @@ def main():
 
              time_stamp = created_at_local.strftime('%d-%m %H:%M:%S')
              new_message = f"{name}[{time_stamp}]:  '{message.content}'"
-             await add_message_to_thread(client_gpt, Myconfig.getThreadID(), new_message)
+             #await add_message_to_thread(client_gpt, Myconfig.getThreadID(), new_message)
             # print(new_message)
              #print("added")
 
@@ -2164,7 +2150,7 @@ def main():
                     hasImage = False
             except Exception as e:
                 hasImage = False
-                print(f"An error occurred: {e}")
+                print(f"An error occurredd: {e}")
             if 'attachment' in message.content.lower():
                 # Extract the first URL containing the word 'attachment' from the message
                 url_match = re.search(r'https?://[^\s]*attachment[^\s]*', message.content)
@@ -2205,7 +2191,7 @@ def main():
                     
 
 
-            if  any(word in message_modif for word in key_phrase) and mentioned_user:
+            if  any(word in message_modif for word in key_phrase) and mentioned_user:                
                 if message_modif.startswith('pajautā jautājumu'):
                     random.seed(time.time())
                     response = random.choice(question_list)
@@ -2219,7 +2205,9 @@ def main():
 
                 # Atdarina lietotāja profila bildi
                 elif atdarini_description is not None and message.reference is None:
-                        atdarini_person(message, atdarini_description, prompts)
+                        #atdarini_person(message, atdarini_description, prompts)
+                        await atdarini_person_grok(message, atdarini_description, prompts)
+                        return
 
                 # Atdarina lietotāja profila bildi random ar chatgpt bez apraksta
                 elif "atdarini " in message.content.lower() and len(message.mentions) > 0 and message.reference is None:
@@ -2291,7 +2279,7 @@ def main():
                     name = getUserName(message.author.name) #@#@#
                     if name is not None:
                        #vards  = unidecode(name)
-                       vards = message.author.name
+                       vards = name
                     else:
                        vards = message.author.name #@#@#
                     if '.' in vards: # Check if nickname exists and contains dots
@@ -2807,112 +2795,196 @@ def main():
                             file.write('\n')   
                         return
                     else: # using sd3 api or dalle3
+                        
+########################### GROK Imagine ##########################################
                         msgg = "*Echoing image...*"
                         wait_msg = await message.channel.send(msgg)                           
                         wait_gif = await                     message.channel.send("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMmZ6d2YzMDllNDR2bzBmenc0dnl1ZGp0b3RqcW9iaGgzcjA4Mm1obyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/BASS1qt1KIQ2HTD5Gs/giphy.gif") 
-                        sd3_key                 = os.getenv('SD3')
-                        filename = f"sd3_{int(time.time())}.jpeg"
-                        file_path = f"./sd3/{filename}"
+                        
+                        ImagineClient = xai_sdk.Client(api_key=os.getenv("XAI_API_KEY"))
+                        
+                        print("GROK imagine started...")
+                        response = ImagineClient.image.sample(
+                            prompt=input_en,
+                            model="grok-imagine-image-2.0",
+                            image_format="base64",
+                        )      
+                        
+                        filename = f"GROK_{int(time.time())}.jpeg"
+                        file_path = f"./GROKimagine/{filename}"
+                        
+                        # raw_b64 = None
 
-                        response = requests.post(
-                            f"https://api.stability.ai/v2beta/stable-image/generate/ultra",
-                            headers={
-                                "authorization": f"Bearer {sd3_key}",
-                                "accept": "image/*"
-                            },
-                            files={"none": ''},
-                            data={
-                                "prompt": f"{input_en}",
-                                "output_format": "jpeg",
+                        # # Try the most likely names
+                        # if hasattr(response, 'b64_json'):
+                            # raw_b64 = response.b64_json
+                        # elif hasattr(response, 'base64'):
+                            # raw_b64 = response.base64
+                        # elif hasattr(response, 'data'):
+                            # raw_b64 = response.data
+                        # elif hasattr(response, 'raw_image'):
+                            # raw_b64 = response.raw_image
+
+                        # if raw_b64 is None:
+                            # # fallback: if response has .images list
+                            # if hasattr(response, 'images') and response.images:
+                                # raw_b64 = response.images[0].b64_json or response.images[0].base64
+
+                        # if raw_b64 and isinstance(raw_b64, str):
+                            # try:
+                                # image_bytes = base64.b64decode(raw_b64)
+                                # with open(file_path, "wb") as file:
+                                    # file.write(image_bytes)
+                                # print(f"Image saved successfully to {file_path}")
+                            # except Exception as decode_err:
+                                # print(f"Decode failed: {decode_err}")
+                                # print(f"Raw base64 preview: {repr(raw_b64[:80])}")
+                        # else:
+                            # print("No usable base64 field found — check printed dir() above")   
+ 
+                        with open(file_path, "wb") as file:
+                            file.write(response.image) 
+ 
+                        await wait_msg.delete()
+                        await wait_gif.delete()
+                        print("....GROK imagine finished.")
+                        file = discord.File(file_path)
+                        new_message = await message.reply(file=file)
+                        
+                        msg_id = new_message.id
+                        new_prompt = {
+                            f"{msg_id}": {
+                                "original": input_en,
+                                "styled": "",
+                                "enchanted": "",
+                                "og_message": message.id,
+                                "model": "GROK",
                                 "aspect_ratio": "1:1",
-                            },
-                        )
-
-                        if response.status_code == 200:
-                            with open(f"{file_path}", 'wb') as file:
-                                file.write(response.content)
-                            file = discord.File(file_path)
-                            await wait_msg.delete()
-                            await wait_gif.delete()
-                            new_message = await message.reply(file=file, view=MainButtons())
-                            msg_id = new_message.id
-                            new_prompt = {
-                                f"{msg_id}": {
-                                    "original": input_en,
-                                    "styled": "",
-                                    "enchanted": "",
-                                    "og_message": message.id,
-                                    "model": "sd3",
-                                    "aspect_ratio": "1:1",
-                                    "last_action": "original",
-                                    "name_of_image": filename,
-                                    "mode": "sd3",
-                                }
+                                "last_action": "original",
+                                "name_of_image": filename,
+                                "mode": "GROK",
                             }
+                        }
 
-                            prompts.update(new_prompt)
-                            with open("prompts.json", "w") as file:
-                                json.dump(prompts, file, indent=4)
-                                file.write('\n')
-                            return
+                        prompts.update(new_prompt)
+                        with open("prompts.json", "w") as file:
+                            json.dump(prompts, file, indent=4)
+                            file.write('\n')
+                        return                        
+########################### GROK Imagine ##########################################
+                        
+                        # sd3_key                 = os.getenv('SD3')
+                        # filename = f"sd3_{int(time.time())}.jpeg"
+                        # file_path = f"./sd3/{filename}"
+                        
+                        # with open(f"{file_path}", "wb") as file:
+                            # file.write(response.image)      
+                        
+                        # await wait_msg.delete()
+                        # await wait_gif.delete()
+                        # new_message = await message.reply(file=file, view=MainButtons())
+                        
+                    
+                        # file = discord.File(file_path)
+                        # response = requests.post(
+                            # f"https://api.stability.ai/v2beta/stable-image/generate/sd3.5-large",
+                            # headers={
+                                # "authorization": f"Bearer {sd3_key}",
+                                # "accept": "image/*"
+                            # },
+                            # files={"none": ''},
+                            # data={
+                                # "prompt": f"{input_en}",
+                                # "output_format": "jpeg",
+                                # "aspect_ratio": "1:1",
+                            # },
+                        # )
 
-                        else:
-                            msgg = "*Echoing image...*"
-                            wait_msg = await message.channel.send(msgg)                           
-                            wait_gif = await                     message.channel.send("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMmZ6d2YzMDllNDR2bzBmenc0dnl1ZGp0b3RqcW9iaGgzcjA4Mm1obyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/BASS1qt1KIQ2HTD5Gs/giphy.gif")                          
-                            response = client_dalle.images.generate(
-                                model="dall-e-3",
-                                prompt=input_en,
-                                size="1024x1024",
-                                quality="hd",
-                                n=1,
-                            )
-                            image_url = response.data[0].url
-                            # Download the image using requests module
-                            response = requests.get(image_url)
-                            image_content = response.content
+                        # if response.status_code == 200:
+                            # with open(f"{file_path}", 'wb') as file:
+                                # file.write(response.content)
+                            # file = discord.File(file_path)
+                            # await wait_msg.delete()
+                            # await wait_gif.delete()
+                            # new_message = await message.reply(file=file, view=MainButtons())
+                            # msg_id = new_message.id
+                            # new_prompt = {
+                                # f"{msg_id}": {
+                                    # "original": input_en,
+                                    # "styled": "",
+                                    # "enchanted": "",
+                                    # "og_message": message.id,
+                                    # "model": "sd3",
+                                    # "aspect_ratio": "1:1",
+                                    # "last_action": "original",
+                                    # "name_of_image": filename,
+                                    # "mode": "sd3",
+                                # }
+                            # }
 
-                            # Generate filename with timestamp
-                            filename = f"generated_image_{int(time.time())}.png"
+                            # prompts.update(new_prompt)
+                            # with open("prompts.json", "w") as file:
+                                # json.dump(prompts, file, indent=4)
+                                # file.write('\n')
+                            # return
 
-                            # Create "generated" directory if it doesn't exist
-                            if not os.path.exists("generated"):
-                                os.makedirs("generated")
+                        # else:
+                            # msgg = "*Echoing image...*"
+                            # wait_msg = await message.channel.send(msgg)                           
+                            # wait_gif = await                     message.channel.send("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMmZ6d2YzMDllNDR2bzBmenc0dnl1ZGp0b3RqcW9iaGgzcjA4Mm1obyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/BASS1qt1KIQ2HTD5Gs/giphy.gif")                          
+                            # response = client_dalle.images.generate(
+                                # model="dall-e-3",
+                                # prompt=input_en,
+                                # size="1024x1024",
+                                # quality="hd",
+                                # n=1,
+                            # )
+                            # image_url = response.data[0].url
+                            # # Download the image using requests module
+                            # response = requests.get(image_url)
+                            # image_content = response.content
 
-                            # Save the image to "generated" directory
-                            with open(f"generated/{filename}", "wb") as f:
-                                f.write(image_content)
+                            # # Generate filename with timestamp
+                            # filename = f"generated_image_{int(time.time())}.png"
 
-                            # Send the saved image as an embed in a Discord message
-                            # Send the saved image as an embed in a Discord message
-                            file = discord.File(f"generated/{filename}")
-                            #embed = discord.Embed()
-                            #embed.set_image(url=f"attachment://{filename}")
-                            await wait_msg.delete()
-                            await wait_gif.delete()
-                            if message.channel.id == Myconfig.getChatChannel():
-                                new_message = await message.channel.send(file=file)
-                            else:
-                                new_message = await message.channel.send(file=file, view = Dalle_buttons2())
+                            # # Create "generated" directory if it doesn't exist
+                            # if not os.path.exists("generated"):
+                                # os.makedirs("generated")
+
+                            # # Save the image to "generated" directory
+                            # with open(f"generated/{filename}", "wb") as f:
+                                # f.write(image_content)
+
+                            # # Send the saved image as an embed in a Discord message
+                            # # Send the saved image as an embed in a Discord message
+                            # file = discord.File(f"generated/{filename}")
+                            # #embed = discord.Embed()
+                            # #embed.set_image(url=f"attachment://{filename}")
+                            # await wait_msg.delete()
+                            # await wait_gif.delete()
+                            # if message.channel.id == Myconfig.getChatChannel():
+                                # new_message = await message.channel.send(file=file)
+                            # else:
+                                # new_message = await message.channel.send(file=file, view = Dalle_buttons2())
                                 
 
-                            msg_id = new_message.id     
-                            new_prompt = {
-                                f"{msg_id}": {
-                                    "original": input_en,
-                                    "styled": "",  # Add your styled content here
-                                    "enchanted": "",  # Add your enchanted content here
-                                    "negative": "",  # Add your enchanted content here
-                                    "support_prompt": "",
-                                }
-                            }
+                            # msg_id = new_message.id     
+                            # new_prompt = {
+                                # f"{msg_id}": {
+                                    # "original": input_en,
+                                    # "styled": "",  # Add your styled content here
+                                    # "enchanted": "",  # Add your enchanted content here
+                                    # "negative": "",  # Add your enchanted content here
+                                    # "support_prompt": "",
+                                # }
+                            # }
 
-                            prompts.update(new_prompt)
-                            with open("prompts.json", "w") as file:
-                                json.dump(prompts, file, indent=4)  # You can adjust the indent for pretty printing
-                                file.write('\n')
-                            raise Exception(str(response.json()))            
-                        return
+                            # prompts.update(new_prompt)
+                            # with open("prompts.json", "w") as file:
+                                # json.dump(prompts, file, indent=4)  # You can adjust the indent for pretty printing
+                                # file.write('\n')
+                            # raise Exception(str(response.json()))            
+                        # return
 
 
                     return
@@ -3038,9 +3110,8 @@ def main():
                 await message.channel.send(response)
                 return                    
 
-            elif message.reference and (pattern.search(message.content.lower())):
-                    if message.author == client.user:
-                        return
+            elif message.reference and (pattern.search(message.content.lower())) and message.reference.resolved.author != client.user:
+
 
                     # Check if the message is a reply to another message
                     if message.reference:
@@ -3083,6 +3154,7 @@ def main():
                         givenResponses.append([replied_zina,[response]])
                         saveResponse(givenResponses)
                         # Send the response
+                        print("found1")
                         await replied_message.reply(response)
                         return
             elif message.reference and ("izlasi" in message.content.lower()):
@@ -3156,35 +3228,56 @@ def main():
                 if hasImage:
                     #zina_ar_bildi = await message.channel.fetch_message(message.reference.message_id)
                     bildes_url =  message.attachments[0].url
+                    
                     current_zina = message_modif
                     gpt_key               = os.getenv("GPT")
                     await message.channel.typing()
 
+ ######################## GROK TESTGROUD #######################################################  
+ 
+                    # client_chat = OpenAI(api_key=gpt_key)
 
-                    client_chat = OpenAI(api_key=gpt_key)
-
-                    responsee = client_chat.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {"role": "system", "content": f"'Your name is 'Elizabete'. People also call you 'mamma'. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji"},
-                        {
-                            "role": "user",
-                            "content": [
-                            {"type": "text", "text": f"user wrote '{current_zina} give generic human like short or medium  answer in context in latvian add your opinion. Do not as questions."},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                "url": bildes_url,
-                                },
-                            },
-                            ],
-                        }
-                        ],
-                        max_tokens=1000,
-                        temperature=0.6,
-                    )
-                    response = responsee.choices[0].message.content
+                    # responsee = client_chat.chat.completions.create(
+                        # model="gpt-4o",
+                        # messages=[
+                            # {"role": "system", "content": f"'Your name is 'Elizabete'. People also call you 'mamma'. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji"},
+                        # {
+                            # "role": "user",
+                            # "content": [
+                            # {"type": "text", "text": f"user wrote '{current_zina} give generic human like short or medium  answer in context in latvian add your opinion. Do not as questions."},
+                            # {
+                                # "type": "image_url",
+                                # "image_url": {
+                                # "url": bildes_url,
+                                # },
+                            # },
+                            # ],
+                        # }
+                        # ],
+                        # max_tokens=1000,
+                        # temperature=0.6,
+                    # )
+                    # response = responsee.choices[0].message.content
+                    # await message.channel.send(response)
+                    #selected_tone = "Brutally honest + savage"
+                    vards = message.author.name
+                    system_content = f"'Your name is 'Elizabete'. People also call you 'mamma'. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes."
+                    user_content   = f"user(his name is {vards}) wrote '{current_zina}' give human like short or medium  answer in context in latvian add your opinion. Do not as questions. DO NOT use emojis."
+                    replied_message = False
+                    needSearch = await checkIfNeedSearch(current_zina, replied_message)
+                    print(f"test1: {needSearch}")
+                    if needSearch:
+                        #system_content =
+                        user_content = f"The response: [{result}]. Make this response bit more compact if needed without mentioning sources. Use Latvian."
+                    print(user_content)
+                    response = ElizabeteGROK(system_content, user_content, hasImage, bildes_url, needSearch)
+                    print("1")
+                    
+                    
                     await message.channel.send(response)
+                 
+                    
+                    
                     return                    
                 #selected_tone = "grounded nostalgic tone"
                 #use_GPT = False
@@ -3198,57 +3291,92 @@ def main():
                     #vards  = unidecode(vards)
 
                 if gptON:
-                    gpt_key               = os.getenv("GPT")
-                    client_chat = OpenAI(api_key=gpt_key)    
+                    # gpt_key               = os.getenv("GPT")
+                    # client_chat = OpenAI(api_key=gpt_key)    
+                    # formatted_chat_history = get_chat_history()
+                    # #print(formatted_chat_history)
+
+
+
+                    # responsee = client_chat.chat.completions.create(
+                    # model='gpt-4o',
+                    # messages = [
+                    # {"role": "system", "content": f'''Your name is "Elizabete". People also call you "mamma".Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You were created 15.03.2023. Reply with short response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Do not mention which tone using.
+                    # {formatted_chat_history}'''},
+                    # {"role": "user", "name" : vards, "content": f"users wrote '{current_zina}' give human-like short answer in context using chat history. If possible  sometimes refer to previous sent messages and users. Do not ask questions. Don't repeat yourself."}
+                    # ],
+                    # max_tokens=700,
+                    # n=1,
+                    # stop=None,
+                    # temperature=0.6,
+                    # )
+                    # response = responsee.choices[0].message.content
+                    # response = response.replace('"', '')
+                    # response = response.replace("'", "")
+                    # if mentioned_user:
+                        # response = f"{mentioned_user.mention} {response}"
+
+                    # # Speciāli atbild uz Yogi ziņām
+                    # if message.author.id == 909845424909729802:
+                       # await message.reply(response)
+                    # else:
+                        # await message.channel.send(response)
+
+                    # givenResponses.append([message_modif,[response]])
+                    # saveResponse(givenResponses)
                     formatted_chat_history = get_chat_history()
-                    #print(formatted_chat_history)
-
-
-
-                    responsee = client_chat.chat.completions.create(
-                    model='gpt-4o',
-                    messages = [
-                    {"role": "system", "content": f'''Your name is "Elizabete". People also call you "mamma".Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You were created 15.03.2023. Reply with short response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Do not mention which tone using. Sometimes use emojis
-                    {formatted_chat_history}'''},
-                    {"role": "user", "name" : vards, "content": f"users wrote '{current_zina}' give human-like short answer in context using chat history. If possible  sometimes refer to previous sent messages and users. Do not ask questions. Don't repeat yourself."}
-                    ],
-                    max_tokens=700,
-                    n=1,
-                    stop=None,
-                    temperature=0.6,
-                    )
-                    response = responsee.choices[0].message.content
-                    response = response.replace('"', '')
-                    response = response.replace("'", "")
-                    if mentioned_user:
-                        response = f"{mentioned_user.mention} {response}"
-
-                    # Speciāli atbild uz Yogi ziņām
-                    if message.author.id == 909845424909729802:
-                       await message.reply(response)
+                    #selected_tone = "Brutally honest + savage"
+                    system_content = f'''Your name is "Elizabete". People also call you "mamma".Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You were created 15.03.2023. Reply with short response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Do not mention which tone using. {formatted_chat_history}'''
+                    user_content = f"user (his name is {vards}) wrote '{current_zina}' give human-like short answer in context using chat history. If possible  sometimes refer to previous sent messages and users. Do not ask questions. Don't repeat yourself. DO NOT use emojis"
+                    hasImage = False
+                    bildes_url = ""
+                    replied_message = False
+                    
+                    
+                    needSearch= await checkIfNeedSearch(current_zina, replied_message)  
+                    working = ""
+                    if needSearch:
+                        #system_content =
+                        working = await message.channel.send("*paga meklēju info...🔍*")
+                        result = await searchGROK(current_zina)
+                        user_content = f"The response: [{result}].Use this tone: [{selected_tone}] Use Latvian."
+                        await working.delete()
+                    print(user_content)
+                    patternn = re.compile(r'\b(ko cilvēki saka|ko cilveki saka|tvito|twito|tvīto|twīto|twitterī|twiteri|twiterī|tviteri|tviterī)\b')
+                    if patternn.search(message_modif.lower()):
+                        response = result
                     else:
-                        await message.channel.send(response)
-
-                    givenResponses.append([message_modif,[response]])
-                    saveResponse(givenResponses)
+                        response = await ElizabeteGROK(system_content, user_content, hasImage, bildes_url, needSearch)
+                    print("2")
+                    
+          
+                    
+                    if mentioned_user:
+                         response = f"{mentioned_user.mention} {response}" 
+                    await message.channel.send(response)
+                    
+                         
                     return
+                    
+                    
+   ######################## GROK TESTGROUD #######################################################                    
                 else:
                     author_name = message.author.name
                     if author_name == "theeight":
-                         vards = "Aģents E" 
+                         vards = "Elvis" 
                 # author_name = message.author.name
                     if author_name == "Resnā mamma":
                          vards = "Elizabete" 
                     if author_name == "theeight":
-                         vards = "Aģents E" 
+                         vards = "Elvis" 
                     if author_name == "daisyvongrim":
-                         vards = "prosta desa" 
+                         vards = "daisy" 
                     if author_name == "megga7866":
-                         vards = "Aģente K"
-                    if author_name == "mitraisbandits":
+                         vards = "Santa"
+                    if author_name == "kapars69":
                          vards = "Kapars"
                     if author_name == "jaanisjc":
-                         vards = "Aģents J"                              
+                         vards = "Jānis"                              
                     formatted_chat_history = get_chat_history()
                     claude_key               = os.getenv("CLAUDE")
                     #pass_prompt = prompt
@@ -3259,7 +3387,7 @@ def main():
                         max_tokens=700,
                         temperature=0.6,
                         system= f"""
-                            Your name is "Elizabete". People also call you "mamma".Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You were created 15.03.2023. Reply with short response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Do not mention which tone using. Sometimes use emojis
+                            Your name is "Elizabete". People also call you "mamma".Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You were created 15.03.2023. Reply with short response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Do not mention which tone using. 
                                                 {formatted_chat_history}
                                 """,
                         messages=[
@@ -3276,7 +3404,20 @@ def main():
                     return
 
             else:
-                response = get_similar_response(message_modif, pairs, threshold=0.3)
+                current_zina = message.content        
+                
+                response_context = get_similar_response(message_modif, pairs, threshold=0.3)
+                formatted_chat_history = get_chat_history()
+                vards = message.author.name
+                #selected_tone = "Brutally honest + savage"
+                system_content = f'''Your name is Elizabete. People also call you 'mamma'. You were created 15.03.2023. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes.'''
+                user_content = f"user (his name is {vards}) wrote this message '{current_zina}' give human-like short answer in context modifying following  message so it is in context and makes sense, message to use: [{response_context}], modify this message as much needed for it to make reosanable response to user written message. DO NOT use emojis"
+                hasImage = False
+                bildes_url = ""
+                replied_zina = False
+                needSearch = await checkIfNeedSearch(current_zina, replied_zina)
+                response = await ElizabeteGROK(system_content, user_content, hasImage, bildes_url, needSearch)            
+                
             if response is not None:
                 givenResponses.append([message_modif,[response]])
                 saveResponse(givenResponses)
@@ -3361,31 +3502,49 @@ def main():
                     #await message.channel.typing()
                     formatted_chat_history = get_chat_history()
 
-                    client_chat = OpenAI(api_key=gpt_key)
 
-                    responsee = client_chat.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {"role": "system", "content": f''''Your name is 'Elizabete'. People also call you 'mamma'. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji
-                            '''},
-                        {
-                            "role": "user",
-                            "content": [
-                            {"type": "text", "text": f"user wrote '{current_zina}' give amusing human like short or medium  opinion about image in latvian. If possible refer to previous sent messages and users. Do not as questions.Don't repeat yourself."},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                "url": bildes_url,
-                                },
-                            },
-                            ],
-                        }
-                        ],
-                        max_tokens=1000,
-                        temperature=0.6,
-                    )
-                    response = responsee.choices[0].message.content
+################### GROK TESTGROUND ####################################
+                    # client_chat = OpenAI(api_key=gpt_key)
+
+                    # responsee = client_chat.chat.completions.create(
+                        # model="gpt-4o",
+                        # messages=[
+                            # {"role": "system", "content": f''''Your name is 'Elizabete'. People also call you 'mamma'. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji
+                            # '''},
+                        # {
+                            # "role": "user",
+                            # "content": [
+                            # {"type": "text", "text": f"user wrote '{current_zina}' give amusing human like short or medium  opinion about image in latvian. If possible refer to previous sent messages and users. Do not as questions.Don't repeat yourself."},
+                            # {
+                                # "type": "image_url",
+                                # "image_url": {
+                                # "url": bildes_url,
+                                # },
+                            # },
+                            # ],
+                        # }
+                        # ],
+                        # max_tokens=1000,
+                        # temperature=0.6,
+                    # )
+                    # response = responsee.choices[0].message.content
+                    # await message.channel.send(response)
+                    vards = message.author.name
+                    #selected_tone = "Brutally honest + savage"
+                    system_content = f"'Your name is 'Elizabete'. People also call you 'mamma'. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes."
+                    user_content   =  f"user(his name is {vards}) wrote '{current_zina}' use {selected_tone}. give amusing human like short or medium opinion about image in latvian. DO NOT use emojis"
+                    print("GROK")
+                    replied_message = False
+                    needSearch = await checkIfNeedSearch(current_zina, replied_message)                     
+                    response = await ElizabeteGROK(system_content, user_content, hasImage, bildes_url, needSearch)
+                    print("3")
+                    
+                    #replied_message = False
+                    #await checkIfNeedSearch(current_zina, replied_message)          
+                    
                     await message.channel.send(response)
+ ################### GROK TESTGROUND ####################################                   
+                    
                     return
                 else:
                     author_name = message.author.name
@@ -3477,25 +3636,65 @@ def main():
                     formatted_chat_history = get_chat_history()
                     #print(formatted_chat_history)
 
+################### GROK TESTGROUND ####################################  
+                    # responsee = client_chat.chat.completions.create(
+                    # model='gpt-4o',
+                    # messages = [
+                    # {"role": "system", "content": f'''Your name is Elizabete. People also call you 'mamma'. You were created 15.03.2023. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji.
+                    # {formatted_chat_history}'''},
+                    # {"role": "user", "content": f"you wrote this answer '{replied_zina}'  and users wrote in response '{current_zina}' give human-like short answer in context using chat history. If possible  sometimes refer to previous sent messages and users. Do not ask questions.Don't repeat yourself"}
+                    # ],
+                    # max_tokens=700,
+                    # n=1,
+                    # stop=None,
+                    # temperature=0.6,
+                    # )                              
+                    # response = responsee.choices[0].message.content
+                    # response = response.replace('"', '')
+                    # response = response.replace("'", "")
+                    name = getUserName(message.author.name)
+                    if name is not None:
+                        # vards  = unidecode(name)
+                        vards = name
+                    else:
+                        vards = message.author.name                    
+                    #vards = message.author.name
+                    #selected_tone = "Brutally honest + savage"
+                    system_content = f'''Your name is Elizabete. People also call you 'mamma'. You were created 15.03.2023. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. {formatted_chat_history}'''
+                    user_content = f"you wrote this answer '{replied_zina}'  and user (his name is {vards}) wrote in response '{current_zina}' give human-like short answer in context using chat history. If possible  sometimes refer to previous sent messages and users. Don't repeat yourself. DO NOT use emojis"
+                    hasImage = False
+                    bildes_url = ""
+                    needSearch = await checkIfNeedSearch(current_zina, replied_zina) 
+                    working = ""
+                    if needSearch:
+                        #system_content =
+                        MessagePair = f"Message: [{replied_zina}], response message to it: [{current_zina}]."
+                        working = await message.channel.send("*paga meklēju info...🔍*")
+                        result = await searchGROK(MessagePair)
+                        user_content = f"The response: [{result}].Use this tone: [{selected_tone}] Use Latvian."
+                        await working.delete() 
+                    print(user_content)
+                    patternn = re.compile(r'\b(ko cilvēki saka|ko cilveki saka|tvito|twito|tvīto|twīto|twitterī|twiteri|twiterī|tviteri|tviterī)\b')
+                    if patternn.search(current_zina.lower()):
+                        response = result
+                    else:             
+                        response = await ElizabeteGROK(system_content, user_content, hasImage, bildes_url, needSearch)      
+                    print("4")
 
-                    responsee = client_chat.chat.completions.create(
-                    model='gpt-4o',
-                    messages = [
-                    {"role": "system", "content": f'''Your name is Elizabete. People also call you 'mamma'. You were created 15.03.2023. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji.
-                    {formatted_chat_history}'''},
-                    {"role": "user", "content": f"you wrote this answer '{replied_zina}'  and users wrote in response '{current_zina}' give human-like short answer in context using chat history. If possible  sometimes refer to previous sent messages and users. Do not ask questions.Don't repeat yourself"}
-                    ],
-                    max_tokens=700,
-                    n=1,
-                    stop=None,
-                    temperature=0.6,
-                    )                              
-                    response = responsee.choices[0].message.content
-                    response = response.replace('"', '')
-                    response = response.replace("'", "")
+                    
+                    
+
+                    
+                    print ("GROK")
                     await message.channel.send(response)
                     givenResponses.append([message.content,[response]])
                     saveResponse(givenResponses)
+                    
+                    
+                    
+################### GROK TESTGROUND ####################################                      
+                    
+                    
                     return
                 else:
                     formatted_chat_history = get_chat_history()
@@ -3508,7 +3707,7 @@ def main():
                         max_tokens=700,
                         temperature=0.6,
                         system= f"""
-                            Your name is Elizabete. People also call you 'mamma'. You were created 15.03.2023. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes. Sometimes use random emoji.
+                            Your name is Elizabete. People also call you 'mamma'. You were created 15.03.2023. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes.
                     {formatted_chat_history}
                                 """,
                         messages=[
@@ -3574,7 +3773,56 @@ def main():
                     return
                 else:
                     #use_GPT = True
-                    response = get_similar_response(message.content , pairs, threshold=0.3)
+ ################### GROK TESTGROUND ####################################                   
+                    
+                    response_context = get_similar_response(message.content , pairs, threshold=0.3)
+                    replied_zina = ''
+                    if message.reference is not None and message.reference.resolved.author.id == client.user.id:                  
+                        replied_message = await message.channel.fetch_message(message.reference.message_id)
+                        replied_zina = replied_message.content
+                    current_zina = message.content        
+                    
+                    
+                    formatted_chat_history = get_chat_history()
+                    name = getUserName(message.author.name)
+                    if name is not None:
+                        # vards  = unidecode(name)
+                        vards = name
+                    else:
+                        vards = message.author.name
+                    #vards = message.author.name
+                    #selected_tone = "Brutally honest + savage"
+                    system_content = f'''Your name is Elizabete. People also call you 'mamma'. You were created 15.03.2023. Todays date is {getDate()}. Precīzs pulkstens šobrīd ir {getTime()}. You pretend that you have given response, recieved an answer from user and reply with compact response in context. Use {selected_tone} tone and respond only with one message with format as simple message without quotes.'''
+                    user_content = f"you wrote this answer '{replied_zina}'  and user (his name is {vards}) wrote in response '{current_zina}' give human-like short answer in context modifying following  message so it is in context and makes sense, message to use: [{response_context}], modify this message as much needed for it to make reosanable response to user written message.  DO NOT use emojis"
+                    hasImage = False
+                    bildes_url = ""
+                    
+                    
+                    
+                    needSearch = await checkIfNeedSearch(current_zina, replied_zina)
+                    
+                    working = ""
+                    if needSearch:
+                        #system_content =
+                        MessagePair = f"Message: [{replied_zina}], response message to it: [{current_zina}]."
+                        working = await message.channel.send("*paga meklēju info...🔍*")
+                        result = await searchGROK(MessagePair)
+                        user_content = f"The response: [{result}].Use this tone: [{selected_tone}] Use Latvian."
+                        await working.delete() 
+                    print(user_content)                   
+                    
+                    response = await ElizabeteGROK(system_content, user_content, hasImage, bildes_url, needSearch)
+                    
+                    
+                    print("5")
+
+                    
+                    
+                    print ("GROK CONTEXT REPLY")                   
+                    print(f"Refference message: {response_context}")
+                    
+                    
+ ################### GROK TESTGROUND ####################################                   
                 if response is not None:
                     givenResponses.append([message.content,[response]])
                     saveResponse(givenResponses)

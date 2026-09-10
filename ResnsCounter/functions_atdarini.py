@@ -25,6 +25,221 @@ from PIL import Image
 from io import BytesIO
 import json
 import time
+import base64
+import xai_sdk
+import os
+
+async def atdarini_person_grok(message, atdarini_description, prompts):
+    
+    ImagineClient = xai_sdk.Client(api_key=os.getenv("XAI_API_KEY"))
+    initiated = False
+    if len(message.mentions) == 1:
+        
+        try:
+            selected_model = "grok-imagine-image-2.0"
+            print(atdarini_description)
+            if "pro" in atdarini_description:
+                selected_model = "grok-imagine-image-2.0"
+                print(selected_model)
+                atdarini_description = atdarini_description.replace("pro", "")
+            print(selected_model)
+            initiated = True
+            msgg = "*Atdarinu bildi...*"
+            wait_msg = await message.channel.send(msgg)                           
+            wait_gif = await                     message.channel.send("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMmZ6d2YzMDllNDR2bzBmenc0dnl1ZGp0b3RqcW9iaGgzcjA4Mm1obyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/BASS1qt1KIQ2HTD5Gs/giphy.gif") 
+            
+            human = " man "
+            if message.mentions[0].id == 122797491044220928 or  message.mentions[0].id == 762091976366620703 or message.mentions[0].id == 391668973315424277 or message.mentions[0].id == 317030319624814592 or message.mentions[0].id == 880446227047665714 :
+                human = " girl "
+            await message.channel.typing()       
+        
+            avatar_url = message.mentions[0].display_avatar.url
+            avatar_response = requests.get(avatar_url)
+            user_id = message.mentions[0].id
+            # Check if the avatar image is a GIF
+            await message.channel.typing()
+            #if user_id == 122797491044220928:
+                #   avatar_name = "IPAdapter_00473_.png"
+
+
+            avatar_name = f"avatar_{user_id}.jpeg"
+            with Image.open(BytesIO(avatar_response.content)) as img:
+                if img.format == 'GIF':
+                    # Convert the GIF image to PNG format
+                    img = img.convert('RGBA')
+                    bg = Image.new('RGBA', img.size, (255, 255, 255))
+                    bg.paste(img, img)
+                    img = bg.convert('RGB')
+                    img.save(f"avatars/{avatar_name}", 'png')
+                else:
+                    # Save the image as PNG directly
+                    img.save(f"avatars/{avatar_name}", 'png')
+                    
+            # Load image from file and encode as base64
+            with open(f"avatars/{avatar_name}", "rb") as f:
+                image_data = base64.b64encode(f.read()).decode("utf-8")
+            
+            smart_prompt = f'''Use the provided image STRICTLY as a facial reference only. 
+                               Preserve the person's exact face, identity, facial features, expression, skin tone, eyes, nose, mouth, proportions, and real skin texture 100% unchanged. NO alterations to the face whatsoever — no reshaping, no beauty filters, no AI modifications, keep it identical to the reference.
+                               Completely reimagine and redesign EVERYTHING else: new body pose, entirely new clothing and accessories, new background and environment, new lighting and atmosphere. Ignore the original body, clothes, and background entirely. Make the rest of the scene creative, different, and fresh compared to the reference image. {human} + {atdarini_description}'''
+            
+            response = ImagineClient.image.sample(
+                prompt=smart_prompt,
+                model=selected_model,
+                image_url=f"data:image/jpeg;base64,{image_data}",
+                image_format="base64",
+            ) 
+        except:
+            initiated = False
+            new_message = await message.reply("Noraidīts.") 
+       
+    elif len(message.mentions) == 2:
+        selected_model = "grok-imagine-image-2.0"
+        if "PRO" in atdarini_description:
+            selected_model = "grok-imagine-image-2.0"
+            print(selected_model)
+            atdarini_description = atdarini_description.replace("PRO", "")
+        print(selected_model)       
+        initiated = True
+        msgg = "*Atdarinu bildi ar diviem...*"
+        wait_msg = await message.channel.send(msgg)                           
+        wait_gif = await                     message.channel.send("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMmZ6d2YzMDllNDR2bzBmenc0dnl1ZGp0b3RqcW9iaGgzcjA4Mm1obyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/BASS1qt1KIQ2HTD5Gs/giphy.gif")       
+        
+        humans = "two men "
+        if message.mentions[0].id == 391668973315424277 and message.mentions[1].id == 317030319624814592:  
+                humans = "two girls "
+        elif message.mentions[1].id == 391668973315424277 and message.mentions[0].id == 317030319624814592:
+            humans = "two girls "
+
+        elif message.mentions[0].id == 122797491044220928 and message.mentions[1].id == 317030319624814592:
+            humans = "two girls "
+        elif message.mentions[1].id == 122797491044220928 and message.mentions[0].id == 317030319624814592:
+            humans = "two girls "
+
+        elif message.mentions[0].id == 122797491044220928 and message.mentions[1].id == 391668973315424277:
+            humans = "two girls "
+        elif message.mentions[1].id == 122797491044220928 and message.mentions[0].id == 391668973315424277:
+            humans = "two girls "
+
+        elif message.mentions[0].id == 880446227047665714 and message.mentions[1].id == 391668973315424277:
+            humans = "two girls "
+        elif message.mentions[1].id == 880446227047665714 and message.mentions[0].id == 391668973315424277:
+            humans = "two girls "      
+        elif message.mentions[0].id == 880446227047665714 and message.mentions[1].id == 317030319624814592:
+            humans = "two girls "
+        elif message.mentions[1].id == 880446227047665714 and message.mentions[0].id == 317030319624814592:
+            humans = "two girls "
+
+        elif message.mentions[0].id == 880446227047665714 and message.mentions[1].id == 122797491044220928:
+            humans = "two girls "
+        elif message.mentions[1].id == 880446227047665714 and message.mentions[0].id == 122797491044220928:
+            humans = "two girls "
+                                        
+        elif message.mentions[0].id == 122797491044220928 or message.mentions[0].id == 762091976366620703 or message.mentions[0].id == 391668973315424277 or message.mentions[0].id == 317030319624814592 or message.mentions[0].id == 880446227047665714:
+            humans = "girl and man "
+        elif message.mentions[1].id == 122797491044220928 or message.mentions[1].id == 762091976366620703 or  message.mentions[1].id == 391668973315424277 or message.mentions[1].id == 317030319624814592 or message.mentions[1].id == 880446227047665714:
+            humans = "man and girl "   
+        
+        await message.channel.typing()  
+        
+        avatar1_url = message.mentions[0].display_avatar.url
+        avatar1_response = requests.get(avatar1_url)
+        user1_id = message.mentions[0].id
+        
+        avatar2_url = message.mentions[1].display_avatar.url
+        avatar2_response = requests.get(avatar2_url)
+        user2_id = message.mentions[1].id      
+        # Check if the avatar image is a GIF
+        await message.channel.typing()
+        
+        #if user_id == 122797491044220928:
+            #   avatar_name = "IPAdapter_00473_.png"
+
+
+        avatar1_name = f"avatar_{user1_id}.jpeg"
+        with Image.open(BytesIO(avatar1_response.content)) as img:
+            if img.format == 'GIF':
+                # Convert the GIF image to PNG format
+                img = img.convert('RGBA')
+                bg = Image.new('RGBA', img.size, (255, 255, 255))
+                bg.paste(img, img)
+                img = bg.convert('RGB')
+                img.save(f"avatars/{avatar1_name}", 'png')
+            else:
+                # Save the image as PNG directly
+                img.save(f"avatars/{avatar1_name}", 'png')
+                
+        avatar2_name = f"avatar_{user2_id}.jpeg"
+        with Image.open(BytesIO(avatar2_response.content)) as img:
+            if img.format == 'GIF':
+                # Convert the GIF image to PNG format
+                img = img.convert('RGBA')
+                bg = Image.new('RGBA', img.size, (255, 255, 255))
+                bg.paste(img, img)
+                img = bg.convert('RGB')
+                img.save(f"avatars/{avatar2_name}", 'png')
+            else:
+                # Save the image as PNG directly
+                img.save(f"avatars/{avatar2_name}", 'png')                
+                
+                
+        # Load image from file and encode as base64
+        with open(f"avatars/{avatar1_name}", "rb") as f:
+            image1_data = base64.b64encode(f.read()).decode("utf-8")
+
+        with open(f"avatars/{avatar2_name}", "rb") as f:
+            image2_data = base64.b64encode(f.read()).decode("utf-8")
+       
+        smart_prompt = f'''Use the provided image STRICTLY as a facial reference only. 
+                           Preserve the person's exact face, identity, facial features, expression, skin tone, eyes, nose, mouth, proportions, and real skin texture 100% unchanged. NO alterations to the face whatsoever — no reshaping, no beauty filters, no AI modifications, keep it identical to the reference.
+                           Completely reimagine and redesign EVERYTHING else: new body pose, entirely new clothing and accessories, new background and environment, new lighting and atmosphere. Ignore the original body, clothes, and background entirely. Make the rest of the scene creative, different, and fresh compared to the reference image. {humans} + {atdarini_description}'''
+       
+        response = ImagineClient.image.sample(
+            prompt=smart_prompt,
+            model=selected_model,
+            image_urls=[f"data:image/jpeg;base64,{image1_data}",f"data:image/jpeg;base64,{image2_data}"],
+            image_format="base64",
+            aspect_ratio="16:9",           
+        )       
+        
+        
+        
+    else:
+        new_message = await message.reply("Pagaidām tikai pa vienam.")   
+
+    if initiated:
+        filename = f"GROK_{int(time.time())}.jpeg"
+        file_path = f"./GROKimagine/{filename}"
+        
+        with open(file_path, "wb") as file:
+            file.write(response.image) 
+        
+        await wait_msg.delete()
+        await wait_gif.delete()
+        print("....GROK imagine finished.")
+        file = discord.File(file_path)
+        new_message = await message.reply(file=file)
+       
+       
+        msg_id = new_message.id
+        new_prompt = {
+            f"{msg_id}": {
+                "original": atdarini_description,
+                "styled": "",
+                "enchanted": "",
+                "og_message": message.id,
+                "model": "GROK",
+                "aspect_ratio": "1:1",
+                "last_action": "original",
+                "name_of_image": filename,
+                "mode": "GROK",
+            }
+        }
+
+        prompts.update(new_prompt)
+        with open("prompts.json", "w") as file:
+            json.dump(prompts, file, indent=4)
+            file.write('\n')  
 async def atdarini_person(message, atdarini_description, prompts):
     if len(message.mentions) == 1:
                 
